@@ -1,0 +1,71 @@
+# Catálogo de agentes especialistas de DataLab (AGENTS.md §2).
+# Consumido por el `orchestrator` para rutear intenciones y por `governance` para auditar
+# quién puede escribir qué. Un agente nunca escribe fuera de su lista `writes`:
+# la transferencia se hace con un handoff válido (infra/agents/handoff.schema.json).
+version: 1
+updated: "2026-02-14"
+handoff_schema: infra/agents/handoff.schema.json
+
+agents:
+  - id: orchestrator
+    name: "Orchestrator & Workflow Agent"
+    intents: [ambiguous, planning, routing, session_control]
+    tools: [router_de_intenciones, airflow_cli, metadata_store, bus_de_agentes]
+    writes:
+      tables: [meta.pipeline_runs, meta.session_events, meta.routing_decisions]
+      buckets: []
+    gate: "Cada paso del plan tiene agente dueño, entrada, salida y criterio de aceptación; score de ruteo >= 0.55 o se pregunta al usuario."
+
+  - id: platform
+    name: "Data Platform & Infrastructure Agent"
+    intents: [stack_ops, secrets_rotation, network_repair]
+    tools: [docker_compose, mc_minio_client, clickhouse_client, healthchecks]
+    writes:
+      tables: [meta.session_events]
+      buckets: ["s3://datalake/bronze", "s3://datalake/silver", "s3://datalake/gold", "s3://datalake/mlflow"]
+    gate: "Healthchecks 9/9 en verde, `dbt build` exit 0 y smoke test del README OK."
+
+  - id: data_engineer
+    name: "Data Engineer Agent"
+    intents: [ingestion, backfill, watermark_repair]
+    tools: [airflow_dags_ingest, postgres_hook, boto3, pyarrow, pandas]
+    writes:
+      tables: [meta.ingest_audit, meta.ingest_watermarks, meta.handoffs]
+      buckets: ["s3://datalake/bronze"]
+    gate: "Filas origen = filas destino por entidad y partición; `meta.ingest_audit` registrado; DAG ingest_oltp_to_bronze en verde."
+
+  - id: analytics_engineer
+    name: "Analytics Engineer Agent"
+    intents: [modeling, kpi_definition, dbt_refactor]
+    tools: [dbt_core, dbt_tests, dbt_docs, sql_clickhouse]
+    writes:
+      tables: [marts.fct_orders, marts.dim_customer, marts.customer_features, meta.handoffs]
+      buckets: ["s3://datalake/silver", "s3://datalake/gold"]
+    gate: "`dbt build` sin fallos y `dbt test --select tag:critical` en verde; granularidad declarada y claves únicas verificadas."
+
+  - id: ds_mlops
+    name: "Data Science & MLOps Agent"
+    intents: [science, training, model_registration, batch_scoring]
+    tools: [jupyterlab, pandas, scikit_learn, xgboost, mlflow_tracking, mlflow_registry]
+    writes:
+      tables: [meta.handoffs, meta.quality_gates]
+      buckets: ["s3://datalake/silver/scoring", "s3://datalake/mlflow"]
+    gate: "ROC-AUC >= 0.72 (baseline), firma de modelo e `input_example` registrados y versión de `churn_classifier` creada en MLflow."
+
+  - id: bi_viz
+    name: "BI & Data Visualization Agent"
+    intents: [visualization, dashboard_publication, metric_certification]
+    tools: [metabase_api, superset_api, sql_analitico, dbt_exposures]
+    writes:
+      tables: [meta.handoffs]
+      buckets: []
+    gate: "Todo KPI es reproducible por SQL, con dueño, definición y fuente declarada; el dashboard solo se publica con quality gate firmado por governance."
+
+  - id: governance
+    name: "Governance & QA Agent"
+    intents: [assurance, contract_validation, drift_monitoring, bias_audit, lineage]
+    tools: [dbt_test, contract_check, drift_report, bias_audit, dbt_docs_lineage]
+    writes:
+      tables: [meta.quality_gates, meta.handoffs, meta.session_events]
+      buckets: []
+    gate: "Cero tests críticos fallidos, PSI < 0.2 (DRIFT_PSI_THRESHOLD) y hallazgos de sesgo documentados con severidad y remediación."

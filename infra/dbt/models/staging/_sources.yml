@@ -1,0 +1,104 @@
+# =====================================================================
+# DataLab Productivo Local — Fuentes Bronze (Parquet en MinIO)
+# Documento: docs/architecture/data-pipeline.md §2 (aterrizaje en el Data Lake)
+#            docs/infrastructure/docker-setup.md (minio:9000, bucket datalake)
+#
+# ClickHouse NO tiene tablas propias para Bronze: lee los Parquet
+# particionados con la función de tabla s3() desde los modelos staging
+# (macro s3_parquet en infra/dbt/macros/s3_sources.sql).
+# Convención de partición: dt=YYYY-MM-DD/part-*.parquet
+# Host interno: minio:9000 · Bucket: datalake (MINIO_BUCKET)
+#
+# La ruta física vive en `meta:` (dbt-core no define `external:` para
+# sources): es documentación consumida por el macro y por el linaje.
+# =====================================================================
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Capa cruda e inmutable del Data Lake (s3://datalake/bronze). La escribe el
+      agente `data_engineer` con psycopg2 + pyarrow + boto3 desde ecommerce_oltp;
+      nunca se reprocesa hacia atrás (se reescribe Silver/Gold).
+    database: datalake
+    schema: bronze
+    loader: data_engineer
+    tags: ["bronze", "silver-source"]
+
+    freshness:
+      warn_after: { count: 24, period: hour }
+      error_after: { count: 48, period: hour }
+    loaded_at_field: updated_at
+
+    tables:
+      - name: orders
+        description: >
+          Extracto incremental de public.orders (watermark = updated_at),
+          particionado por día de extracción.
+        meta:
+          location: "http://minio:9000/datalake/bronze/orders/dt=*/part-*.parquet"
+          file_format: "Parquet"
+        columns:
+          - name: order_id
+            description: "Clave natural del pedido (TEXT en el OLTP)."
+          - name: customer_id
+            description: "FK a public.customers (se une con dim_customer)."
+          - name: order_ts
+            description: "Marca de tiempo del pedido en UTC (TIMESTAMPTZ)."
+          - name: status
+            description: "pending | paid | shipped | delivered | cancelled | refunded."
+          - name: channel
+            description: "Canal de venta: web | app | phone."
+          - name: total_amount
+            description: "Importe total del pedido; debe cuadrar con sus order_items."
+          - name: updated_at
+            description: "Watermark de la extracción incremental (también campo de freshness)."
+
+      - name: order_items
+        description: "Líneas de pedido; una fila por (order_id, product_id)."
+        meta:
+          location: "http://minio:9000/datalake/bronze/order_items/dt=*/part-*.parquet"
+          file_format: "Parquet"
+
+      - name: payments
+        description: "Pagos por pedido; origen de marts.fct_payments vía stg_payments."
+        meta:
+          location: "http://minio:9000/datalake/bronze/payments/dt=*/part-*.parquet"
+          file_format: "Parquet"
+
+      - name: customers
+        description: >
+          Extracto de public.customers. Contiene datos personales: a partir de
+          Silver solo se propagan enmascarados (email_hash, phone_masked).
+        meta:
+          location: "http://minio:9000/datalake/bronze/customers/dt=*/part-*.parquet"
+          file_format: "Parquet"
+        columns:
+          - name: customer_id
+            description: "Clave natural del cliente (TEXT en el OLTP)."
+          - name: email
+            description: "Email original (PII): en Silver se convierte en email_hash."
+          - name: phone
+            description: "Teléfono original (PII): en Silver se convierte en phone_masked."
+          - name: city
+            description: "Ciudad de residencia; se normaliza con lower(trim())."
+          - name: updated_at
+            description: "Watermark de la extracción incremental (también campo de freshness)."
+
+      - name: products
+        description: "Catálogo de productos; origen de marts.dim_product."
+        meta:
+          location: "http://minio:9000/datalake/bronze/products/dt=*/part-*.parquet"
+          file_format: "Parquet"
+
+      - name: sellers
+        description: "Vendedores; origen de marts.dim_seller vía stg_sellers."
+        meta:
+          location: "http://minio:9000/datalake/bronze/sellers/dt=*/part-*.parquet"
+          file_format: "Parquet"
+
+      - name: support_tickets
+        description: "Tickets de soporte; alimenta tickets_support_90d de customer_features."
+        meta:
+          location: "http://minio:9000/datalake/bronze/support_tickets/dt=*/part-*.parquet"
+          file_format: "Parquet"

@@ -1,0 +1,88 @@
+# =====================================================================
+# DataLab Productivo Local — Proyecto dbt `datalab`
+# Documento: docs/architecture/data-pipeline.md §2-§5 (medallion bronze→gold)
+#            docs/mlops/mlflow-dbt-pipeline.md (features y linaje)
+#
+# Capas y materializaciones:
+#   staging/       Parquet Bronze → vistas limpias y tipadas (tag silver)
+#   intermediate/  integración reutilizable, sin agregación final (tag silver)
+#   marts/         esquema en estrella en ClickHouse `marts` (tag gold)
+#   customer_features  incremental de features para churn (tag features)
+# =====================================================================
+name: "datalab"
+version: "1.0.0"
+config-version: 2
+
+# Perfil definido en infra/dbt/profiles.yml (target por defecto: dev).
+profile: "datalab"
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+# Los tests singulares viven en infra/dbt/tests/*.sql: un .sql dentro de
+# `models/` sería tratado como MODELO, no como test.
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+require-dbt-version: [">=1.8.0", "<1.9.0"]
+
+models:
+  datalab:
+    +persist_docs:
+      relation: true
+      columns: true
+
+    # ── Capa Silver: conformado sobre Parquet Bronze ──────────────────
+    staging:
+      +materialized: view
+      +tags: ["silver"]
+      +schema: marts_staging
+    intermediate:
+      +materialized: view
+      +tags: ["silver"]
+      +schema: marts_staging
+
+    # ── Capa Gold: esquema en estrella en la base `marts` ─────────────
+    marts:
+      +materialized: table
+      +tags: ["gold"]
+      +schema: marts
+      dim_customer:
+        # SCD2: se reconstruye completo para recalcular valid_from/valid_to.
+        +materialized: table
+      fct_orders:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+        +unique_key: order_id
+      fct_payments:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+        +unique_key: payment_id
+      customer_features:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+        +unique_key: customer_id
+        +tags: ["gold", "features"]
+
+# Capa de semillas curadas: mapea la categoría del OLTP a un segmento de
+# negocio y una prioridad comercial (usada por marts.dim_product).
+seeds:
+  datalab:
+    product_category_map:
+      +schema: marts_staging
+      +tags: ["silver", "seed"]
+      +column_types:
+        category: String
+        segment: String
+        priority: UInt8
+
+# Variables de proyecto: bucket del Data Lake (MinIO) leído por los staging
+# mediante la función s3() de ClickHouse.
+vars:
+  bronze_bucket: datalake
+  bronze_prefix: bronze
+  minio_endpoint_host: minio
+  minio_endpoint_port: 9000
+  # Umbral de antigüedad (días) para etiquetar churn en customer_features.
+  churn_days: 180

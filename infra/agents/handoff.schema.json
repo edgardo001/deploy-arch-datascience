@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datalab.local/schemas/handoff.schema.json",
+  "title": "Contrato de handoff entre agentes DataLab",
+  "description": "Mensaje tipado con el que un agente transfiere trabajo a otro. Se define en docs/agents/orchestration-rules.md §5 y lo valida el agente orchestrator: un handoff sin run_id, sin ts o con status fuera del enum se rechaza y se re-solicita al emisor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "from",
+    "to",
+    "intent",
+    "status",
+    "artifacts",
+    "contracts",
+    "preconditions_met",
+    "metrics",
+    "next_agent",
+    "ts"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Identificador único del run; clave foránea entre Airflow, MLflow y meta.pipeline_runs.",
+      "examples": ["run_2026-02-14T09-30-12Z_a13f"]
+    },
+    "from": {
+      "type": "string",
+      "description": "Agente emisor del handoff (id del catálogo infra/agents/catalog.yaml).",
+      "enum": [
+        "orchestrator",
+        "platform",
+        "data_engineer",
+        "analytics_engineer",
+        "ds_mlops",
+        "bi_viz",
+        "governance"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "description": "Agente receptor del handoff (id del catálogo infra/agents/catalog.yaml).",
+      "enum": [
+        "orchestrator",
+        "platform",
+        "data_engineer",
+        "analytics_engineer",
+        "ds_mlops",
+        "bi_viz",
+        "governance"
+      ]
+    },
+    "intent": {
+      "type": "string",
+      "description": "Intención de negocio que motiva la transferencia (taxonomía de orchestration-rules.md §2).",
+      "enum": [
+        "stack_ops",
+        "ingestion",
+        "modeling",
+        "science",
+        "visualization",
+        "assurance",
+        "ambiguous"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "description": "Resultado del tramo entregado: ok (completo), parcial (entregable incompleto) o fallido.",
+      "enum": ["ok", "parcial", "fallido"]
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Rutas verificables producidas: s3://, file://, modelos MLflow (models:/...), tablas o URLs.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [
+        [
+          "s3://datalake/bronze/orders/dt=2026-02-14/part-000.parquet",
+          "models:/churn_classifier/Production"
+        ]
+      ]
+    },
+    "contracts": {
+      "type": "object",
+      "description": "Contratos cumplidos o acordados en la transferencia (conteos, versión de esquema, hashes).",
+      "additionalProperties": true,
+      "examples": [{ "rows_in": 148233, "rows_out": 148233, "schema_version": "v3" }]
+    },
+    "preconditions_met": {
+      "type": "array",
+      "description": "Precondiciones verificadas antes de transferir, p. ej. stack_healthy, data_freshness, tests_passed.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [["bronze_complete", "schema_validated", "tests_passed"]]
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Métricas del tramo: duración, reintentos, filas, métricas de modelo o de calidad.",
+      "additionalProperties": true,
+      "examples": [{ "duration_s": 118, "retries": 0, "roc_auc": 0.81 }]
+    },
+    "next_agent": {
+      "type": "string",
+      "description": "Siguiente agente esperado por el plan; 'ninguno' cuando el run termina en este handoff.",
+      "enum": [
+        "orchestrator",
+        "platform",
+        "data_engineer",
+        "analytics_engineer",
+        "ds_mlops",
+        "bi_viz",
+        "governance",
+        "ninguno"
+      ]
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Marca temporal ISO-8601 en UTC del momento de emisión del handoff.",
+      "examples": ["2026-02-14T09:32:10Z"]
+    }
+  }
+}

@@ -1,0 +1,279 @@
+# DataLab Productivo Local — Modern Data Stack + MLOps
+# Uso:  cp .env.example .env  &&  docker compose up -d
+# Doc:  docs/infrastructure/docker-setup.md
+name: datalab
+
+x-profiles: &all [core, orchestration, ml, bi]
+
+services:
+  # ── 1. Fuente transaccional (OLTP) ────────────────────────────────
+  oltp-postgres:
+    image: postgres:16-alpine
+    container_name: oltp-postgres
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_OLTP_DB}
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_OLTP_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles: *all
+    networks: [datalab_net]
+
+  # ── 2. Data Lake compatible con S3 ────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_data:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles: *all
+    networks: [datalab_net]
+
+  # Bootstrap idempotente de buckets (one-shot)
+  minio-init:
+    image: minio/mc:RELEASE.2024-06-13T22-53-53Z
+    container_name: minio-init
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      mc mb -p local/datalake/bronze local/datalake/silver local/datalake/gold local/datalake/mlflow &&
+      mc anonymous set none local/datalake &&
+      echo '[minio-init] buckets listos'
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    profiles: [core]
+    restart: "no"
+    networks: [datalab_net]
+
+  # ── 3. Data Warehouse / OLAP ──────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["8123:8123", "${CLICKHOUSE_NATIVE_PORT:-9100}:9000"]
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8123/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles: *all
+    networks: [datalab_net]
+
+  # ── 4. Orquestación ───────────────────────────────────────────────
+  airflow:
+    # Imagen propia: la base "slim" de Airflow no trae providers ni librerías
+    # (PostgresHook, boto3, pandas, pyarrow, dbt-clickhouse, mlflow...).
+    build: ./infra/airflow
+    image: datalab/airflow:2.9.3
+    container_name: airflow
+    restart: unless-stopped
+    user: "${AIRFLOW_UID:-50000}:0"
+    env_file: [.env]
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_META_DB}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    command: >
+      bash -c "airflow db migrate &&
+               (airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD}
+                 --firstname Data --lastname Lab --role Admin --email admin@datalab.local || true) &&
+               exec airflow webserver"
+    ports: ["8080:8080"]
+    volumes:
+      - ./infra/airflow/dags:/opt/airflow/dags
+      - ./infra/airflow/plugins:/opt/airflow/plugins
+      - ./infra/pipelines:/opt/airflow/pipelines:ro
+      - ./infra/qa:/opt/airflow/qa:ro
+      - ./infra/contracts:/opt/airflow/contracts:ro
+      - ./infra/dbt:/usr/app/dbt
+      - airflow_logs:/opt/airflow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      oltp-postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+    profiles: [orchestration]
+    networks: [datalab_net]
+
+  # ── 5. Transformación analítica (efímero) ─────────────────────────
+  dbt:
+    build: ./infra/dbt
+    container_name: dbt
+    env_file: [.env]
+    environment:
+      DBT_PROFILES_DIR: /usr/app/dbt
+      DBT_TARGET: ${DBT_TARGET:-dev}
+    entrypoint: ["dbt"]
+    command: ["--version"]
+    volumes:
+      - ./infra/dbt:/usr/app/dbt
+      - dbt_artifacts:/usr/app/dbt/target
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    profiles: [transform]
+    restart: "no"
+    networks: [datalab_net]
+
+  # ── 6. MLOps: tracking y registro de modelos ─────────────────────
+  mlflow:
+    build: ./infra/mlflow
+    container_name: mlflow
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_META_DB}
+      --default-artifact-root s3://${MINIO_BUCKET}/mlflow
+    ports: ["5000:5000"]
+    volumes: ["mlflow_artifacts:/mlartifacts"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      oltp-postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    profiles: [ml]
+    networks: [datalab_net]
+
+  # ── 7. Entorno de experimentación ────────────────────────────────
+  jupyter:
+    image: quay.io/jupyter/pyspark-notebook:2024-06-01
+    container_name: jupyter
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    command: >
+      start-notebook.py --ip=0.0.0.0 --port=8888 --no-browser
+      --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.root_dir=/home/jovyan/work
+    ports: ["8888:8888"]
+    volumes: ["./infra/jupyter/work:/home/jovyan/work"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8888/api/status')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles: [ml]
+    networks: [datalab_net]
+
+  # ── 8-9. BI y dashboarding ───────────────────────────────────────
+  metabase:
+    image: metabase/metabase:v0.50.13
+    container_name: metabase
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    volumes: ["metabase_data:/metabase-data"]
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3000' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles: [bi]
+    networks: [datalab_net]
+
+  superset:
+    image: apache/superset:3.1.3
+    container_name: superset
+    restart: unless-stopped
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+    ports: ["8088:8088"]
+    volumes: ["superset_data:/app/superset_home"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles: [bi]
+    networks: [datalab_net]
+
+  # ── 10. Memoria de largo plazo (vector DB) ───────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    container_name: qdrant
+    restart: unless-stopped
+    ports: ["6333:6333"]
+    volumes: ["qdrant_data:/qdrant/storage"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles: [ml]
+    networks: [datalab_net]
+
+networks:
+  datalab_net:
+    name: datalab_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  pgdata:
+  minio_data:
+  clickhouse_data:
+  airflow_logs:
+  dbt_artifacts:
+  mlflow_artifacts:
+  metabase_data:
+  superset_data:
+  qdrant_data:

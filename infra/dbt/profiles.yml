@@ -1,0 +1,66 @@
+# =====================================================================
+# DataLab Productivo Local — Perfil de conexión dbt
+# Documento: docs/infrastructure/docker-setup.md (servicio `dbt`)
+#            docs/agents/specialists-deep-dive.md §analytics_engineer
+#
+# DBT_PROFILES_DIR=/usr/app/dbt (definido en la imagen y en docker-compose).
+# Los hosts son SIEMPRE nombres de servicio internos de la red `datalab_net`
+# (`clickhouse`, `minio`); nunca `localhost`.
+# Ningún secreto hardcodeado: todo llega por env_var() desde .env.
+# =====================================================================
+datalab:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+
+  outputs:
+    # ── Data Warehouse principal: ClickHouse 24.3 sobre la base `marts` ──
+    dev:
+      type: clickhouse
+      schema: marts
+      host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"
+      port: "{{ env_var('CLICKHOUSE_PORT', '8123') | int }}"
+      user: "{{ env_var('CLICKHOUSE_USER', 'dbt') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', '') }}"
+      secure: false
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+      driver: http
+      connect_timeout: 10
+      send_receive_timeout: 300
+      custom_settings:
+        # timezone explícita para que toDate()/now() sean deterministas.
+        session_timezone: "{{ env_var('DATALAB_TIMEZONE', 'UTC') }}"
+
+    # Producción local: mismo motor, esquema distinto para no pisar `marts`.
+    prod:
+      type: clickhouse
+      schema: "{{ env_var('CLICKHOUSE_DB', 'marts') }}"
+      host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"
+      port: "{{ env_var('CLICKHOUSE_PORT', '8123') | int }}"
+      user: "{{ env_var('CLICKHOUSE_USER', 'dbt') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', '') }}"
+      secure: false
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+      driver: http
+      custom_settings:
+        session_timezone: "{{ env_var('DATALAB_TIMEZONE', 'UTC') }}"
+
+    # ── Output opcional sin warehouse: DuckDB local (desarrollo/CI) ──────
+    # Uso:  dbt build --target duckdb      (modelos de marts sobre /tmp)
+    duckdb:
+      type: duckdb
+      path: /tmp/datalab.duckdb
+      schema: marts
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+
+    # ── Alternativa por driver nativo (puerto 9000 interno) ──────────────
+    # No se usa por defecto: CLICKHOUSE_NATIVE_PORT expone 9100 en el host,
+    # mientras que dentro de `datalab_net` el nativo sigue siendo 9000.
+    native:
+      type: clickhouse
+      schema: marts
+      host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"
+      port: "{{ env_var('CLICKHOUSE_NATIVE_HOST_PORT', '9000') | int }}"
+      user: "{{ env_var('CLICKHOUSE_USER', 'dbt') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', '') }}"
+      secure: false
+      driver: native
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"

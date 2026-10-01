@@ -1,0 +1,119 @@
+# Contratos de datos de la capa Gold (docs/architecture/data-pipeline.md §5).
+# Validados por el agente `governance` con `infra/qa/contract_check.py`, que comprueba existencia de
+# tabla/columna, nulos y unicidad de claves contra ClickHouse y persiste el resultado en
+# `meta.quality_gates`. Un fallo de severidad `critical` bloquea la publicación de Gold.
+#
+# Fuente de verdad alineada con los datos reales:
+#   · esquema y CHECKs del OLTP → infra/postgres/init/02_oltp_schema.sql
+#   · valores realmente sembrados → infra/postgres/init/03_oltp_seed.sql
+#   · columnas y tipos materializados → infra/dbt/models/marts/*.sql y marts/_marts.yml
+# Los `type` documentan el tipo ClickHouse esperado; `nullable: false` se verifica con conteo de
+# nulos y las `rule` son el contrato de negocio (los enums citados existen en la fuente).
+version: 2
+engine: clickhouse
+database: marts
+source: infra/dbt/models/marts
+
+tables:
+
+  marts.fct_orders:
+    owner: analytics_engineer
+    granularity: "1 fila por línea de pedido (order_id + product_id)"
+    sla:
+      freshness_column: ordered_at
+      max_delay_minutes: 1440          # 24 h
+      severity: warn
+    columns:
+      - {name: "order_id",     type: "String",        nullable: false, rule: "pedido de origen (ORD-######); no nulo"}
+      - {name: "product_id",   type: "String",        nullable: false, rule: "producto de la línea (PRD-#####); no nulo"}
+      - {name: "customer_id",  type: "String",        nullable: false, rule: "FK a marts.dim_customer.customer_id"}
+      - {name: "date_key",     type: "UInt32",        nullable: false, rule: "FK a marts.dim_date.date_key (YYYYMMDD)"}
+      - {name: "order_date",   type: "Date",          nullable: false, rule: "fecha del pedido derivada de ordered_at"}
+      - {name: "ordered_at",   type: "DateTime",      nullable: false, rule: "timestamp del pedido; columna de frescura (24 h)"}
+      - {name: "status",       type: "String",        nullable: false, rule: "enum OLTP: pending, paid, shipped, delivered, cancelled, refunded"}
+      - {name: "channel",      type: "String",        nullable: false, rule: "canal de venta; semilla: web, app, phone"}
+      - {name: "seller_id",    type: "String",        nullable: true,  rule: "vendedor del producto (LEFT JOIN); nulo si el producto no tiene vendedor"}
+      - {name: "product_sk",   type: "String",        nullable: true,  rule: "FK sustituta a marts.dim_product.product_sk (LEFT JOIN)"}
+      - {name: "category",     type: "String",        nullable: true,  rule: "categoría; semilla: electronica, hogar, moda, deportes, libros"}
+      - {name: "brand",        type: "String",        nullable: true,  rule: "marca del producto"}
+      - {name: "quantity",     type: "UInt32",        nullable: false, rule: "> 0 (CHECK del OLTP en order_items)"}
+      - {name: "unit_price",   type: "Decimal(18,2)", nullable: false, rule: ">= 0"}
+      - {name: "discount_pct", type: "Decimal(18,2)", nullable: false, rule: "entre 0 y 100 (CHECK del OLTP)"}
+      - {name: "line_total",   type: "Decimal(18,2)", nullable: false, rule: ">= 0; importe neto de la línea"}
+      - {name: "total_amount", type: "Decimal(18,2)", nullable: false, rule: ">= 0; total del pedido repetido en cada línea (no sumar en crudo)"}
+      - {name: "gross_margin", type: "Decimal(18,2)", nullable: true,  rule: "line_total - (quantity * cost_amount)"}
+      - {name: "margin_rate",  type: "Float64",       nullable: true,  rule: "ratio de margen de la línea; puede ser negativo"}
+      - {name: "updated_at",   type: "DateTime",      nullable: false, rule: "greatest(updated_at del pedido, del producto)"}
+    critical_tests:
+      - {id: "fct_orders_pk_unica",          type: "unique_combination", columns: [order_id, product_id], severity: "critical"}
+      - {id: "fct_orders_pedido_no_nulo",    type: "not_null",           columns: [order_id],    severity: "critical"}
+      - {id: "fct_orders_producto_no_nulo",  type: "not_null",           columns: [product_id],  severity: "critical"}
+      - {id: "fct_orders_fk_customer",       type: "not_null",           columns: [customer_id], severity: "critical"}
+      - {id: "fct_orders_fk_date",           type: "not_null",           columns: [date_key],    severity: "critical"}
+      - {id: "fct_orders_rango_importe",     type: "accepted_range",     columns: [total_amount], min: 0, severity: "critical"}
+      - {id: "fct_orders_rango_cantidad",    type: "accepted_range",     columns: [quantity], min: 1, severity: "warn"}
+      - {id: "fct_orders_frescura",          type: "freshness",          columns: [ordered_at], max_delay_minutes: 1440, severity: "warn"}
+
+  marts.dim_customer:
+    owner: analytics_engineer
+    # SCD2: NO se puede exigir unicidad de customer_id (hay una fila por versión).
+    granularity: "1 fila por versión SCD2 de cliente (customer_id + valid_from); customer_sk única"
+    sla:
+      freshness_column: updated_at
+      max_delay_minutes: 1440
+      severity: warn
+    columns:
+      - {name: "customer_sk",  type: "String",   nullable: false, rule: "clave sustituta de la versión (MD5 de customer_id|valid_from)"}
+      - {name: "customer_id",  type: "String",   nullable: false, rule: "clave natural (CUS-#####); se repite una vez por versión"}
+      - {name: "full_name",    type: "String",   nullable: false, rule: "nombre completo del cliente"}
+      - {name: "email_hash",   type: "String",   nullable: false, rule: "PII enmascarada: SHA-256 del email en minúsculas"}
+      - {name: "phone_masked", type: "String",   nullable: true,  rule: "PII enmascarada (+34 6** **** 78); el teléfono original no llega a Gold"}
+      - {name: "city",         type: "String",   nullable: false, rule: "ciudad normalizada en minúsculas; semilla: madrid, barcelona, valencia, sevilla, bilbao, malaga, zaragoza, murcia"}
+      - {name: "region",       type: "String",   nullable: false, rule: "región normalizada en minúsculas"}
+      - {name: "segment",      type: "String",   nullable: false, rule: "CHECK del OLTP: retail, pyme, enterprise"}
+      - {name: "gender",       type: "String",   nullable: true,  rule: "columna sensible; CHECK del OLTP: f, m, x (admite nulo)"}
+      - {name: "age_band",     type: "String",   nullable: true,  rule: "columna sensible; CHECK del OLTP: 18-24, 25-34, 35-44, 45-54, 55+ (admite nulo)"}
+      - {name: "valid_from",   type: "Date",     nullable: false, rule: "inicio de vigencia de la versión SCD2"}
+      - {name: "valid_to",     type: "Date",     nullable: false, rule: "fin de vigencia; 2099-12-31 en la versión vigente"}
+      - {name: "is_current",   type: "UInt8",    nullable: false, rule: "1 = versión vigente, 0 = histórica"}
+      - {name: "version",      type: "UInt8",    nullable: false, rule: "1 = histórica, 2 = vigente"}
+      - {name: "version_days", type: "Int64",    nullable: false, rule: "dateDiff('day', valid_from, valid_to); >= 0"}
+      - {name: "updated_at",   type: "DateTime", nullable: false, rule: "marca de actualización para frescura"}
+    critical_tests:
+      - {id: "dim_customer_pk_unica",     type: "unique",    columns: [customer_sk], severity: "critical"}
+      - {id: "dim_customer_natural_id",   type: "not_null",  columns: [customer_id], severity: "critical"}
+      - {id: "dim_customer_scd2_vigente", type: "not_null",  columns: [valid_from],  severity: "critical"}
+      - {id: "dim_customer_frescura",     type: "freshness", columns: [updated_at], max_delay_minutes: 1440, severity: "warn"}
+
+  marts.customer_features:
+    owner: ds_mlops
+    granularity: "1 fila por cliente con actividad en 365 d (customer_id) y report_date = fecha de cálculo"
+    sla:
+      freshness_column: updated_at
+      max_delay_minutes: 1440
+      severity: warn
+    columns:
+      - {name: "customer_id",         type: "String",        nullable: false, rule: "PK de la foto de features; FK a marts.dim_customer.customer_id"}
+      - {name: "report_date",         type: "Date",          nullable: false, rule: "fecha de cálculo de la foto (today())"}
+      - {name: "recency_days",        type: "Int64",         nullable: false, rule: ">= 0; días desde la última compra (ventana 90 d)"}
+      - {name: "orders_last_30d",     type: "UInt32",        nullable: false, rule: ">= 0; pedidos en los últimos 30 d"}
+      - {name: "monetary_365d",       type: "Decimal(18,2)", nullable: false, rule: ">= 0; importe de líneas en 365 d"}
+      - {name: "avg_ticket",          type: "Decimal(18,2)", nullable: false, rule: ">= 0; 0 = cliente sin compras en los últimos 365 d (el modelo hace coalesce a 0)"}
+      - {name: "tickets_support_90d", type: "UInt32",        nullable: false, rule: ">= 0; tickets de soporte en 90 d"}
+      - {name: "churn_label",         type: "UInt8",         nullable: false, rule: "1 = sin compra desde hace 180 d; sin nulos"}
+      - {name: "orders_total",        type: "UInt32",        nullable: false, rule: ">= 1; pedidos no cancelados en la ventana de features"}
+      - {name: "first_order_date",    type: "Date",          nullable: false, rule: "primera compra de la ventana"}
+      - {name: "last_order_date",     type: "Date",          nullable: false, rule: "última compra; base del cálculo de recency_days y churn_label"}
+      - {name: "updated_at",          type: "DateTime",      nullable: false, rule: "toDateTime(today()); columna de frescura"}
+    critical_tests:
+      # Gate duro del contrato de features: la etiqueta y el importe nunca son negativos ni nulos.
+      - {id: "features_pk_unica",         type: "unique",         columns: [customer_id],   severity: "critical"}
+      - {id: "features_fk_customer",      type: "not_null",       columns: [customer_id],   severity: "critical"}
+      - {id: "features_etiqueta_nula",    type: "not_null",       columns: [churn_label],   severity: "critical"}
+      - {id: "features_recency_rango",    type: "accepted_range", columns: [recency_days],  min: 0, severity: "critical"}
+      - {id: "features_monetary_rango",   type: "accepted_range", columns: [monetary_365d], min: 0, severity: "critical"}
+      - {id: "features_avg_ticket_rango", type: "accepted_range", columns: [avg_ticket],    min: 0, severity: "critical"}
+      # Señal blanda: ticket medio > 0 identifica clientes inactivos (sin compras en 365 d). Un fallo
+      # aquí NO bloquea Gold (severity warn); el gate duro de avg_ticket es >= 0.
+      - {id: "features_avg_ticket_inactivo", type: "accepted_range", columns: [avg_ticket], min: 0.01, severity: "warn"}
+      - {id: "features_frescura",         type: "freshness",      columns: [updated_at], max_delay_minutes: 1440, severity: "warn"}

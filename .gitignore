@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────
+# DataLab Productivo Local — exclusiones de Git
+# Nunca se versionan credenciales, logs ni artefactos generados.
+# ─────────────────────────────────────────────────────────────────────
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+infra/**/.env
+*.pem
+*.key
+!*.key.pub
+
+# Artefactos de Airflow y dbt
+infra/airflow/logs/
+infra/airflow/plugins/__pycache__/
+infra/dbt/target/
+infra/dbt/logs/
+infra/dbt/dbt_packages/
+infra/dbt/package-lock.yml
+logs/
+target/
+
+# Python y notebooks
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Datos locales, backups y snapshots
+backup/
+*.dump
+*.parquet
+*.duckdb
+data/
+snapshots/
+mlruns/
+mlartifacts/
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

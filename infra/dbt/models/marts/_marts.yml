@@ -1,0 +1,197 @@
+# DataLab Productivo Local — Contratos y tests de la capa Gold (marts)
+# Doc: docs/architecture/data-pipeline.md §5 (contratos y SLOs) ·
+#      docs/agents/specialists-deep-dive.md (DoD de analytics_engineer).
+# Cada modelo declara su GRANULARIDAD; los tests genéricos (unique, not_null,
+# relationships, accepted_range) bloquean la publicación de Gold si fallan.
+# Los marcados con `config: {tags: ['critical']}` son el *quality gate* del
+# DAG transform_dbt_marts (`dbt test --select tag:critical`).
+# El seed curado `product_category_map` (categoría del OLTP → segmento y
+# prioridad comercial) se versiona en el bloque `seeds:` y lo usa dim_product.
+version: 2
+
+seeds:
+  - name: product_category_map
+    description: "Categoría del OLTP → segmento y prioridad comercial; la usa dim_product."
+    config:
+      tags: ["silver", "seed"]
+
+models:
+  - name: dim_date
+    description: "Calendario. GRANULARIDAD: 1 fila por día (date_key = YYYYMMDD)."
+    columns:
+      - name: date_key
+        description: "Clave sustituta del día (YYYYMMDD)."
+        tests: [unique, not_null]
+      - name: date_day
+        description: "Fecha natural del calendario."
+
+  - name: dim_customer
+    description: >
+      Dimensión cliente SCD2. GRANULARIDAD: 1 fila por versión de cliente
+      (customer_id + valid_from); una sola fila con is_current = 1 por cliente.
+    columns:
+      - name: customer_sk
+        description: "Clave sustituta de la versión (MD5 de customer_id|valid_from)."
+        tests: [{unique: {config: {tags: ['critical']}}}, {not_null: {config: {tags: ['critical']}}}]
+      - name: customer_id
+        description: "Clave natural; se repite una vez por versión."
+        tests: [not_null]
+      - name: email_hash
+        description: "SHA-256 del email; el dato original nunca llega a Gold."
+        tests: [not_null]
+      - name: gender
+        description: "Columna sensible usada por la auditoría de sesgo."
+      - name: age_band
+        description: "Columna sensible; en {18-24, 25-34, 35-44, 45-54, 55+}."
+      - name: valid_from
+        description: "Inicio de vigencia de la versión SCD2."
+        tests: [not_null]
+      - name: updated_at
+        description: "Marca de actualización usada como frescura."
+        tests: [not_null]
+      - name: is_current
+        description: "1 = versión vigente, 0 = versión histórica."
+        tests:
+          - accepted_values: {values: [0, 1]}
+
+  - name: dim_product
+    description: "Dimensión producto. GRANULARIDAD: 1 fila por producto (product_id)."
+    columns:
+      - name: product_sk
+        description: "Clave sustituta del producto (MD5 de product_id)."
+        tests: [{unique: {config: {tags: ['critical']}}}, {not_null: {config: {tags: ['critical']}}}]
+      - name: product_id
+        description: "Clave natural; se une a fct_orders.product_id."
+        tests: [unique, not_null]
+      - name: category
+        description: "Categoría cruda del OLTP; clave de unión con el seed."
+      - name: category_segment
+        description: "Segmento de negocio resuelto por el seed `product_category_map`."
+      - name: category_priority
+        description: "Prioridad comercial (1 = máxima)."
+        tests:
+          - accepted_range: {min_value: 1, max_value: 5}
+      - name: unit_margin
+        description: "Margen unitario teórico (list_price - cost_amount)."
+        tests:
+          - accepted_range: {min_value: -1000000}
+
+  - name: dim_seller
+    description: "Dimensión vendedor. GRANULARIDAD: 1 fila por vendedor (seller_id)."
+    columns:
+      - name: seller_sk
+        description: "Clave sustituta del vendedor."
+        tests: [unique, not_null]
+      - name: seller_id
+        description: "Clave natural del vendedor."
+        tests: [unique, not_null]
+
+  - name: fct_orders
+    description: >
+      Hecho de ventas. GRANULARIDAD: 1 fila por LÍNEA de pedido
+      (order_id + product_id). Incremental delete+insert por order_id.
+    columns:
+      - name: order_id
+        description: "Pedido de origen (TEXT)."
+        tests: [{not_null: {config: {tags: ['critical']}}}]
+      - name: product_id
+        description: "Producto de la línea."
+        tests: [{not_null: {config: {tags: ['critical']}}}]
+      - name: customer_id
+        description: "Cliente del pedido; debe existir en dim_customer."
+        tests:
+          - not_null:
+              config: {tags: ['critical']}
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_id
+      - name: date_key
+        description: "FK a dim_date (YYYYMMDD)."
+        tests:
+          - not_null:
+              config: {tags: ['critical']}
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: product_sk
+        description: "FK sustituta a dim_product."
+        tests:
+          - relationships:
+              to: ref('dim_product')
+              field: product_sk
+      - name: total_amount
+        description: "Total del pedido repetido en cada línea (no sumar en crudo)."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: line_total
+        description: "Importe neto de la línea (cantidad x precio - descuento)."
+        tests:
+          - not_null
+          - accepted_range: {min_value: 0}
+      - name: status
+        description: "Estado normalizado en Silver."
+        tests:
+          - accepted_values:
+              values: ["pending", "paid", "shipped", "delivered", "cancelled", "refunded"]
+
+  - name: fct_payments
+    description: >
+      Hecho de cobros. GRANULARIDAD: 1 fila por PAGO (payment_id).
+      Incremental delete+insert por payment_id.
+    columns:
+      - name: payment_id
+        description: "Clave natural del pago."
+        tests: [{unique: {config: {tags: ['critical']}}}, {not_null: {config: {tags: ['critical']}}}]
+      - name: order_id
+        description: "Pedido cobrado."
+        tests:
+          - not_null:
+              config: {tags: ['critical']}
+          - relationships:
+              to: ref('fct_orders')
+              field: order_id
+      - name: paid_amount
+        description: "Importe cobrado (>= 0)."
+        tests:
+          - not_null
+          - accepted_range: {min_value: 0}
+      - name: date_key
+        description: "FK a dim_date por fecha de pago."
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+  - name: customer_features
+    description: >
+      Features de churn. GRANULARIDAD: 1 fila por CLIENTE (customer_id) con
+      report_date = fecha de cálculo. Incremental delete+insert por customer_id.
+    columns:
+      - name: customer_id
+        description: "Cliente de la foto de features."
+        tests: [{unique: {config: {tags: ['critical']}}}, {not_null: {config: {tags: ['critical']}}}]
+      - name: recency_days
+        description: "Días desde la última compra (0 = compró hoy)."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: orders_last_30d
+        description: "Nº de pedidos en los últimos 30 días."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: monetary_365d
+        description: "Importe acumulado de líneas en 365 días."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: avg_ticket
+        description: "Ticket medio por línea en 365 días."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: tickets_support_90d
+        description: "Tickets de soporte abiertos en 90 días."
+        tests:
+          - accepted_range: {min_value: 0}
+      - name: churn_label
+        description: "Etiqueta de churn: 1 si no compra desde hace 180 días."
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1]}
