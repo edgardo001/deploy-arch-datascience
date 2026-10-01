@@ -221,7 +221,8 @@ services:
     ports: ["8888:8888"]
     volumes: ["./infra/jupyter/work:/home/jovyan/work"]
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8888/api/status')\""]
+      # `/login` es público (200); `/api/*` exige token y daría 403 aunque el servidor esté bien.
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8888/login')\""]
       interval: 15s
       timeout: 5s
       retries: 5
