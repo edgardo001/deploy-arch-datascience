@@ -125,7 +125,7 @@ services:
     env_file: [.env]
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_META_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_AIRFLOW_DB:-airflow_meta}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}

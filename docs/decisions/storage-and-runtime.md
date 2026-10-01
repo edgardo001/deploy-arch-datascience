@@ -27,7 +27,7 @@
 |---|---|
 | **Decisión** | `ecommerce_oltp`, `datalab_meta` y `airflow_meta` conviven en `oltp-postgres` |
 | **Contexto** | Entorno local de pruebas con RAM limitada y un solo operador |
-| **Por qué** | Ahorra ~300 MB de RAM y tres healthchecks; un único `pgdata` simplifica *backup* y `down -v`; el aislamiento se logra por base y por usuario, no por proceso |
+| **Por qué** | Ahorra ~300 MB de RAM y tres healthchecks; un único `pgdata` simplifica *backup* y `down -v`; el aislamiento se logra por base y por usuario, no por proceso. Airflow usa `airflow_meta` y NO `datalab_meta`: ambos motores (Airflow y MLflow) versionan con la tabla `alembic_version` y si comparten base se pisan las migraciones (`Can't locate revision` en bucle) |
 | **Cuándo NO** | Producción con distintas criticidades, ventanas de mantenimiento o requisitos de cifrado por dominio; si un fallo de OLTP no debe tumbar la metadata de Airflow |
 | **Señal de migración** | El OLTP entra en mantenimiento y el orquestador se queda sin metadata; o se exige *compliance* separado por base |
 | **Reversibilidad** | **Alta**: cambiar el DSN en `.env` y en las conexiones de Airflow |

@@ -70,10 +70,12 @@ deploy-arch-datascience/
 |---|---|---|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Superusuario de la instancia PostgreSQL | `datalab` / `datalab_dev_pwd` |
 | `POSTGRES_OLTP_DB` | Base transaccional | `ecommerce_oltp` |
-| `POSTGRES_META_DB` | Metadata store de agentes y runs | `datalab_meta` |
+| `POSTGRES_META_DB` | Metadata store de agentes y runs (también backend de MLflow) | `datalab_meta` |
+| `POSTGRES_AIRFLOW_DB` | Backend de Airflow (separado: Airflow y MLflow comparten la tabla `alembic_version` y se pisan) | `airflow_meta` |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Credenciales S3 locales | `minioadmin` / `minioadmin` |
 | `MINIO_BUCKET` | Bucket raíz del lake | `datalake` |
 | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` | Usuario analítico del DW | `dbt` / `dbt_dev_pwd` |
+| `CLICKHOUSE_HTTP_PORT` | Puerto host de la API HTTP (contenedor siempre 8123) | `8123` (Windows + WinNAT: `18123`) |
 | `AIRFLOW_UID` | UID del host para permisos de logs | `1000` (`id -u`) |
 | `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` | Acceso a la UI de Airflow | `admin` / `admin` |
 | `MLFLOW_TRACKING_URI` | Backend de tracking | `http://mlflow:5000` |
@@ -104,7 +106,7 @@ services:
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_META_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@oltp-postgres:5432/${POSTGRES_AIRFLOW_DB}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     ports: ["8080:8080"]
     volumes:

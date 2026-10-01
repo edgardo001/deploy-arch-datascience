@@ -123,8 +123,10 @@ Regla de oro: ningún `.md` supera 200 líneas; lo que exceda se desglosa en `/d
 # 1. Preparar entorno (WSL2/Linux/macOS) — el .env define COMPOSE_PROFILES=core,orchestration,ml,bi
 cp .env.example .env          # ajustar credenciales locales
 
-# 2. Levantar el stack completo (perfiles tomados del .env)
-docker compose up -d
+# 2. Levantar el stack completo (perfiles tomados del .env).
+# `--build` es obligatorio la primera vez: airflow/mlflow/dbt son imágenes
+# locales y sin él Compose intenta descargarlas del registry y falla.
+docker compose up -d --build
 
 # 3. (Opcional) perfiles parciales: solo núcleo, solo BI, solo ML
 docker compose --profile core up -d
