@@ -3,7 +3,7 @@
 > **Documento vivo.** Registra el prompt inicial y **cada petición nueva** del usuario, en orden, con su
 > interpretación, entregables, evidencia y estado. El prompt inicial íntegro vive en
 > [initial-prompt.md](initial-prompt.md); aquí solo se resume y se enlaza.
-> Última actualización: **2026-10-01** · Peticiones registradas: **7** (3 archivadas).
+> Última actualización: **2026-10-01** · Peticiones registradas: **8** (3 archivadas).
 
 ## 1. Protocolo de mantenimiento (obligatorio en cada petición nueva)
 
@@ -28,6 +28,7 @@
 | `P-005` | 2026-10-01 | Crear `FAQ.md` para dudas y comentarios, con actualización periódica y respuestas breves enlazadas a `/docs` | `FAQ.md` (34 consultas + 4 abiertas) y protocolo en AGENTS §1.8 | ✅ Verificada |
 | `P-006` | 2026-10-01 | Poder aprender el proyecto: áreas especialistas como agentes, más agentes Profesor y Alumno que resuelvan dudas | `docs/learning/` (5 archivos: 9 módulos, 14 labs, rúbrica y agentes `professor`/`student`) | ✅ Verificada |
 | `P-007` | 2026-10-01 | Ruta de tareas diarias: saber moverse en el entorno y qué se solicita comúnmente en el área | [daily-routine.md](../learning/daily-routine.md) + [daily-tasks.md](../learning/daily-tasks.md) (`T-01`…`T-20`) | ✅ Verificada |
+| `P-008` | 2026-10-01 | Mejorar la redacción del texto de origen e incorporarlo como descripción inicial del proyecto (caso de estudio de un entorno productivo de Data Science) | [case-study.md](../case-study.md) + encabezado y fila de índice del README | ✅ Verificada |
 
 > `P-001`…`P-003`: cerradas y archivadas íntegras en [archive-2026-Q4.md](archive-2026-Q4.md).
 
@@ -91,6 +92,20 @@
 | Archivos tocados | 2 nuevos en `docs/learning/`, índice y §7 del README, `learning/README.md` y `curriculum.md` (tablas y navegación), glosario §7 (`T-0N`) y FAQ §8 (`F-045`…`F-048`). |
 | Protocolo estrenado | Al superar el registro las 180 líneas, `P-001`…`P-003` se movieron **verbatim** a [archive-2026-Q4.md](archive-2026-Q4.md) y el índice del README se consolidó por temas para no crecer. |
 | Evidencia | 27 documentos, ninguno > 180 líneas · 0 enlaces rotos · índice 27/27 · 20 tareas `T-0NN` y 20 tipos de solicitud, todos con comando o entregable verificable. |
+| Estado | ✅ Verificada |
+
+### `P-008` — Descripción inicial: caso de estudio y redacción mejorada
+
+> «ten en cuenta esta conversacion, la idea seria agregarla como descripcion inicial del proyecto, entendiendo que es un caso de estudio y/o de compresion de un ambiente productivo de datascience: mejora mi redaccion»
+
+| Campo | Detalle |
+|---|---|
+| Interpretación | El proyecto necesitaba su **marco conceptual**: no solo «qué herramientas hay», sino «por qué existen y quién responde de cada parte». El texto de origen describía la sensación de que, sin estar en el área, es difícil ver la arquitectura completa y los cargos detrás de un dashboard. |
+| Redacción | Se corrigió ortografía y puntuación, se separó la idea en tres párrafos y se añadió la distinción clave: Infraestructura de TI/Cloud provee máquinas y red; Data Engineering **instala y configura** las herramientas sobre esa base; Analytics Engineering modela; Data Science/MLOps construyen y mantienen modelos; BI y analistas convierten en decisiones. |
+| Entregables | [case-study.md](../case-study.md): texto inicial mejorado, **iceberg de 6 capas**, tabla de **12 cargos** con lo que ve cada uno, sección «quién levanta qué», mapeo organigrama de la industria → agentes del repo, 6 aprendizajes y rutas de recorrido. |
+| Archivos tocados | `docs/case-study.md` (nuevo), encabezado del [README.md](../../README.md) (marco de caso de estudio y corrección de «7 agentes» → 9), fila de índice, [learning/README.md](../learning/README.md) §8 y [FAQ.md](../../FAQ.md) §7 (`F-049`). |
+| Evidencia | 28 documentos, ninguno > 180 líneas · 0 enlaces rotos · índice del README 28/28 · 12 cargos y 6 capas del iceberg, cada uno con su artefacto o agente asociado. |
+| Decisión de diseño | El texto personal se conserva **citado** en el documento (§1) y la versión documental se separa en tablas, para no perder la voz original ni mezclarla con la especificación. |
 | Estado | ✅ Verificada |
 
 ## 4. Convenciones
