@@ -98,7 +98,7 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    ports: ["8123:8123", "${CLICKHOUSE_NATIVE_PORT:-9100}:9000"]
+    ports: ["${CLICKHOUSE_HTTP_PORT:-8123}:8123", "${CLICKHOUSE_NATIVE_PORT:-9100}:9000"]
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
@@ -254,7 +254,7 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
-    ports: ["8088:8088"]
+    ports: ["${SUPERSET_PORT:-8088}:8088"]
     volumes: ["superset_data:/app/superset_home"]
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8088' || exit 1"]

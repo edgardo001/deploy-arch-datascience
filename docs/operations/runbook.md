@@ -48,13 +48,14 @@ docker compose exec airflow airflow dags list
 |---|---|---|
 | `airflow` en `unhealthy` | `AIRFLOW_UID` sin definir o logs sin permisos | `echo "AIRFLOW_UID=$(id -u)" >> .env` y `docker compose up -d --force-recreate airflow` |
 | dbt: `Database Error: Connection refused` | Perfil apuntando a `localhost` dentro de la red Docker | Usar nombre de servicio (`clickhouse`, `minio`) como host |
-| MLflow sin artefactos | Falta `MLFLOW_S3_ENDPOINT_URL` o credenciales S3 | Definir `MLFLOW_S3_ENDPOINT_URL=http://minio:9000` y `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` con las de MinIO |
-| MinIO responde 403 en `mc` | Alias apuntando a `localhost` o credenciales desalineadas | Reejecutar `docker compose up -d minio-init` (usa `MC_HOST_local`) |
+| MLflow sin artefactos | Falta `MLFLOW_S3_ENDPOINT_URL` o credenciales S3 | Definir `MLFLOW_S3_ENDPOINT_URL=http://minio:9000` y `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` con `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` |
+| Lake responde 403 en S3 | Credenciales desalineadas o bucket inexistente | Reejecutar `docker compose up -d minio-init` (AWS CLI contra `http://minio:9000`) |
 | ClickHouse OOM | `max_memory_usage` alto en joins grandes | Reducir `max_bytes_before_external_group_by` |
 | Puerto ocupado (`8080`, `3000`, `5000`) | Otro servicio del host | Remapear en `ports:` y actualizar el mapa de servicios del README |
+| Bind prohibido en Windows (`forbidden by its access permissions`) | Puerto en rango excluido de WinNAT/Hyper-V (`netsh interface ipv4 show excludedportrange`) | No tocar el compose: fijar `SUPERSET_PORT=18088` o `CLICKHOUSE_HTTP_PORT=18123` en `.env` (solo cambia el lado host) y `docker compose up -d` |
 | Metabase lento al inicio | Migración interna de H2 | Esperar 2–3 min; conectar con `jdbc:clickhouse://clickhouse:8123/marts` |
 | JupyterLab pide token y no entra | `JUPYTER_TOKEN` distinto al de la URL | Leer el token en `.env` y usar `?token=$JUPYTER_TOKEN` |
-| dbt falla por `s3()` | URL del lake mal formada o MinIO no saludable | Verificar `http://minio:9000/datalake/bronze/<entidad>/dt=*/*.parquet` |
+| dbt falla por `s3()` | URL del lake mal formada o RustFS no saludable | Verificar `http://minio:9000/datalake/bronze/<entidad>/dt=*/*.parquet` |
 | Drift marca `congelar` | PSI > `DRIFT_PSI_THRESHOLD` | Reentrenar y revisar la fuente; ver [mlflow-dbt-pipeline.md](../mlops/mlflow-dbt-pipeline.md) |
 
 ## 5. Playbooks de recuperación

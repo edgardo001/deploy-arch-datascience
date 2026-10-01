@@ -81,6 +81,7 @@ deploy-arch-datascience/
 | `MLFLOW_TRACKING_URI` | Backend de tracking | `http://mlflow:5000` |
 | `MLFLOW_S3_ENDPOINT_URL` | Endpoint S3 para artefactos | `http://minio:9000` |
 | `JUPYTER_TOKEN` | Token de acceso a JupyterLab | `datalab` |
+| `SUPERSET_PORT` | Puerto host de Superset (contenedor siempre 8088) | `8088` (Windows + WinNAT: `18088`) |
 | `DBT_PROFILES_DIR` / `DBT_TARGET` | Perfil y destino de dbt | `/usr/app/dbt` / `dev` |
 
 ## 5. Fragmentos clave de `docker-compose.yml`
