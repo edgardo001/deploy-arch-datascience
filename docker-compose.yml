@@ -30,38 +30,60 @@ services:
     networks: [datalab_net]
 
   # ── 2. Data Lake compatible con S3 ────────────────────────────────
+  # RustFS 1.0 (Apache-2.0): sustituye a MinIO (AGPLv3 + imágenes borradas
+  # de Docker Hub en sep-2026; ver TD-01 resuelta en docs/decisions).
+  # Se conservan servicio, puertos, credenciales y rutas s3://datalake/…,
+  # por lo que pipelines, dbt, MLflow y docs no cambian.
   minio:
-    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    image: rustfs/rustfs:1.0.0
     container_name: minio
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    depends_on:
+      lake-permission-helper: { condition: service_completed_successfully }
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     ports: ["9000:9000", "9001:9001"]
     volumes: ["minio_data:/data"]
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "sh", "-ec", "curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
     profiles: *all
     networks: [datalab_net]
 
-  # Bootstrap idempotente de buckets (one-shot)
+  # La imagen oficial corre como usuario no-root (10001:10001); este one-shot
+  # deja el volumen escribible antes de arrancar el servidor (patrón upstream).
+  lake-permission-helper:
+    image: alpine:3
+    container_name: lake-permission-helper
+    command: ["sh", "-c", "chown -R 10001:10001 /data && echo '[lake-permission-helper] permisos listos'"]
+    volumes: ["minio_data:/data"]
+    profiles: *all
+    restart: "no"
+    networks: [datalab_net]
+
+  # Bootstrap idempotente del bucket (one-shot, AWS CLI Apache-2.0 sobre API S3)
   minio-init:
-    image: minio/mc:RELEASE.2024-06-13T22-53-53Z
+    image: amazon/aws-cli:2.27.0
     container_name: minio-init
     depends_on:
       minio: { condition: service_healthy }
     entrypoint: ["/bin/sh", "-c"]
-    command: >
-      mc mb -p local/datalake/bronze local/datalake/silver local/datalake/gold local/datalake/mlflow &&
-      mc anonymous set none local/datalake &&
-      echo '[minio-init] buckets listos'
+    # Lista de UN elemento: en forma string Compose trocea por palabras y
+    # `sh -c` solo recibiría `aws` (ver historial). Así llega el script íntegro.
+    command: ["aws --endpoint-url http://minio:9000 --region us-east-1 s3 mb s3://datalake 2>&1 || true && echo '[minio-init] bucket datalake listo'"]
     environment:
-      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
     profiles: [core]
     restart: "no"
     networks: [datalab_net]
