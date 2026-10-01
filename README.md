@@ -1,8 +1,11 @@
 # DataLab Productivo Local — Modern Data Stack + MLOps
 
-> Entorno local reproducible de **Ciencia e Ingeniería de Datos productiva**.
-> Emula el stack que usan las empresas data-driven: OLTP → Data Lake → Lakehouse → DW → ML/BI,
-> orquestado por Airflow, transformado con dbt, versionado con MLflow y operado por **7 agentes especialistas**.
+> Entorno local reproducible de **Ciencia e Ingeniería de Datos productiva**, concebido como **caso de estudio**
+> para comprender un ambiente productivo de Data Science: qué hay detrás de un dashboard y de qué responde cada
+> cargo → [docs/case-study.md](docs/case-study.md).
+> Emula el stack que usan las empresas data-driven: OLTP → Data Lake → Lakehouse → DW → ML/BI, orquestado por
+> Airflow, transformado con dbt, versionado con MLflow y operado por **9 agentes** (7 especialistas + `professor`
+> y `student`).
 
 | Campo | Valor |
 |---|---|
@@ -10,7 +13,7 @@
 | Recorrido del dato | PostgreSQL OLTP → MinIO (Bronze) → dbt (Silver/Gold) → ClickHouse → ML/BI |
 | Orquestador | Apache Airflow 2.9 (LocalExecutor) |
 | Runtime | Docker Compose v2 sobre Linux / macOS / WSL2 |
-| Equipo de agentes | 7 roles en [AGENTS.md](AGENTS.md) |
+| Equipo de agentes | 9 roles (7 especialistas + `professor` y `student`) en [AGENTS.md](AGENTS.md) |
 | Estado y contexto | [MEMORY.md](MEMORY.md) |
 | Verificación | Puerto por puerto, ver [§5](#5-verificación-de-servicios) |
 
@@ -100,13 +103,13 @@ Narrativa paso a paso del viaje del dato: [docs/architecture/data-pipeline.md](d
 | [README.md](README.md) | Vista general, arquitectura, quickstart y verificación | Raíz |
 | [AGENTS.md](AGENTS.md) | Catálogo operativo de los 7 agentes y protocolos | Raíz |
 | [MEMORY.md](MEMORY.md) | Memoria corta/larga, estado global y persistencia | Raíz |
+| [docs/case-study.md](docs/case-study.md) | **Descripción inicial: caso de estudio, iceberg de capas y mapa de cargos de la industria** | Raíz |
 | [FAQ.md](FAQ.md) | Dudas y comentarios: consultas breves y enlace a la sección que las responde | Raíz |
 | [docs/glossary.md](docs/glossary.md) | Siglas, términos y los 10 servicios explicados uno por uno | Referencia |
 | [docs/architecture/data-pipeline.md](docs/architecture/data-pipeline.md) · [docs/infrastructure/docker-setup.md](docs/infrastructure/docker-setup.md) | Arquitectura e infraestructura: viaje del dato, servicios y puertos | Módulo |
 | [docs/agents/orchestration-rules.md](docs/agents/orchestration-rules.md) · [docs/agents/specialists-deep-dive.md](docs/agents/specialists-deep-dive.md) | Agentes: ruteo, guardrails y comandos por especialista | Módulo |
 | [docs/mlops/mlflow-dbt-pipeline.md](docs/mlops/mlflow-dbt-pipeline.md) · [docs/memory/memory-persistence.md](docs/memory/memory-persistence.md) · [docs/operations/runbook.md](docs/operations/runbook.md) | MLOps, persistencia, retención y runbook operativo | Módulo |
-| [docs/learning/](docs/learning/README.md) · [curriculum](docs/learning/curriculum.md) · [professor y student](docs/learning/professor-and-student-agents.md) · [labs](docs/learning/exercises-labs.md) · [labs ML/BI](docs/learning/labs-quality-ml-bi.md) · [evaluación](docs/learning/assessment.md) | **Capa de aprendizaje**: 9 módulos, 14 labs y rúbrica, guiada por los agentes `professor` y `student` | Aprendizaje |
-| [docs/learning/daily-routine.md](docs/learning/daily-routine.md) · [tareas diarias](docs/learning/daily-tasks.md) | **Tareas diarias `T-01`…`T-20`**: ritmo de trabajo, solicitudes típicas del área y priorización | Aprendizaje |
+| [docs/learning/](docs/learning/README.md) · [curriculum](docs/learning/curriculum.md) · [professor y student](docs/learning/professor-and-student-agents.md) · [labs](docs/learning/exercises-labs.md) · [labs ML/BI](docs/learning/labs-quality-ml-bi.md) · [evaluación](docs/learning/assessment.md) · [rutina diaria](docs/learning/daily-routine.md) · [tareas `T-01`…`T-20`](docs/learning/daily-tasks.md) | **Aprendizaje y práctica laboral**: 9 módulos, 14 labs, rúbrica y 20 tareas diarias guiadas por `professor` y `student` | Aprendizaje |
 | [docs/decisions/README.md](docs/decisions/README.md) · [storage-and-runtime](docs/decisions/storage-and-runtime.md) · [orchestration-and-transform](docs/decisions/orchestration-and-transform.md) · [ml-bi-and-memory](docs/decisions/ml-bi-and-memory.md) | Decisiones (ADR `D-01`…`D-18`): por qué, cuándo NO, alternativas, pros y contras | Referencia |
 | [docs/prompts/initial-prompt.md](docs/prompts/initial-prompt.md) · [prompt-log.md](docs/prompts/prompt-log.md) · [archivo 2026-Q4](docs/prompts/archive-2026-Q4.md) | Prompt inicial literal, bitácora viva de peticiones (`P-00N`) y archivo histórico | Módulo |
 | [docker-compose.yml](docker-compose.yml) · [.env.example](.env.example) · [.gitignore](.gitignore) | Stack ejecutable y configuración local | Ejecutable |

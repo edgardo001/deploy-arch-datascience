@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Aquí se dejan las consultas breves; cada una se responde en **1-2 líneas** o, mejor,
 > apuntando a la **sección exacta** de `docs/` que la resuelve. Versión inicial: **2026-10-01** (todas las
-> respuestas llevan esa fecha) · Consultas registradas: **44** + **4 abiertas**.
+> respuestas llevan esa fecha) · Consultas registradas: **45** + **4 abiertas**.
 > Contexto del proyecto: [README.md](README.md) · Petición que lo originó: [prompt-log.md](docs/prompts/prompt-log.md) `P-005`.
 
 ## 1. Cómo usar y mantener esta FAQ
@@ -78,6 +78,7 @@
 | `F-032` | ¿Cómo propongo un cambio en la documentación? | Se registra como petición `P-00N` y, si nace de una duda, se enlaza aquí → [prompt-log.md](docs/prompts/prompt-log.md) §1 |
 | `F-033` | ¿Hay pruebas automáticas? | Tests dbt (`tag: critical` como *gate*) y auditorías en `infra/qa/` → [specialists-deep-dive.md](docs/agents/specialists-deep-dive.md) §4 y §7 |
 | `F-034` | ¿Qué evidencia hay de que esto funciona? | Conteos de líneas, enlaces, YAML/JSON y sintaxis Python verificados; la ejecución real con Docker queda pendiente → [README.md](README.md) §6 |
+| `F-049` | ¿Qué es este proyecto y por qué existe? | Caso de estudio para comprender un entorno productivo de Data Science: el iceberg de capas y el mapa de cargos → [case-study.md](docs/case-study.md) |
 
 ## 8. Aprendizaje: profesor, alumno y rutas
 

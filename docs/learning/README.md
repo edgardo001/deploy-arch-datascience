@@ -93,4 +93,5 @@
 | [AGENTS.md](../../AGENTS.md) | Catálogo de los 9 agentes (7 especialistas + Profesor + Alumno) |
 | [glossary.md](../glossary.md) | Siglas del proyecto, incluidas las de esta capa (`M-0N`, `L-0N`, `Q-0N`) |
 | [decisions/README.md](../decisions/README.md) | Por qué cada herramienta y cuándo deja de servir |
+| [case-study.md](../case-study.md) | Por qué existe el proyecto y qué cargos de la industria representa |
 | [FAQ.md](../../FAQ.md) | Dudas breves con respuesta y enlace |
