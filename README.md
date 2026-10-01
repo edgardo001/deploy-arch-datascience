@@ -29,18 +29,19 @@
 
 | # | Servicio | Rol en el stack | Contenedor | Puerto host |
 |---|---|---|---|---|
-| 1 | PostgreSQL OLTP | Fuente transaccional (e-commerce) | `oltp-postgres` | 5432 |
-| 2 | MinIO | Data Lake compatible con S3 (Parquet crudo) | `minio` | 9000 / 9001 (consola) |
-| 3 | ClickHouse | Data Warehouse OLAP (modelo estrella) | `clickhouse` | 8123 (HTTP) / 9100 (native) |
-| 4 | Apache Airflow | Orquestación ETL/ELT (DAGs) | `airflow` | 8080 |
-| 5 | dbt Core | Transformación analítica + tests | `dbt` (efímero / perfil `transform`) | — |
-| 6 | MLflow | Tracking de experimentos y Model Registry | `mlflow` | 5000 |
-| 7 | JupyterLab | Entorno de experimentación Python/PySpark | `jupyter` | 8888 |
-| 8 | Metabase | BI self-service | `metabase` | 3000 |
-| 9 | Apache Superset | Dashboards avanzados | `superset` | 8088 |
-| 10 | Qdrant | Memoria vectorial de los agentes (perfil `ml`) | `qdrant` | 6333 |
+| 1 | [PostgreSQL OLTP](https://www.postgresql.org/) | Fuente transaccional (e-commerce) | `oltp-postgres` | 5432 |
+| 2 | [RustFS](https://rustfs.com/) | Data Lake compatible con S3 (Parquet crudo) | `minio` | 9000 / 9001 (consola) |
+| 3 | [ClickHouse](https://clickhouse.com/) | Data Warehouse OLAP (modelo estrella) | `clickhouse` | 8123 (HTTP) / 9100 (native) |
+| 4 | [Apache Airflow](https://airflow.apache.org/) | Orquestación ETL/ELT (DAGs) | `airflow` | 8080 |
+| 5 | [dbt Core](https://www.getdbt.com/) | Transformación analítica + tests | `dbt` (efímero / perfil `transform`) | — |
+| 6 | [MLflow](https://mlflow.org/) | Tracking de experimentos y Model Registry | `mlflow` | 5000 |
+| 7 | [JupyterLab](https://jupyter.org/) | Entorno de experimentación Python/PySpark | `jupyter` | 8888 |
+| 8 | [Metabase](https://www.metabase.com/) | BI self-service | `metabase` | 3000 |
+| 9 | [Apache Superset](https://superset.apache.org/) | Dashboards avanzados | `superset` | 8088 |
+| 10 | [Qdrant](https://qdrant.tech/) | Memoria vectorial de los agentes (perfil `ml`) | `qdrant` | 6333 |
 
 Detalle de imágenes, volúmenes, healthchecks y variables: [docs/infrastructure/docker-setup.md](docs/infrastructure/docker-setup.md).
+Enlaces oficiales (sitio, documentación y GitHub) de cada herramienta: [docs/glossary.md](docs/glossary.md) §8.
 **Siglas de esta tabla** (OLTP, OLAP, ELT/ETL, DAG, S3, BI, *one-shot*) y qué es y para qué sirve **cada servicio**: [docs/glossary.md](docs/glossary.md). **Por qué se eligió cada herramienta, cuándo no se recomienda y sus alternativas**: [docs/decisions/README.md](docs/decisions/README.md).
 
 ## 3. Arquitectura del pipeline de datos
@@ -150,8 +151,8 @@ docker compose exec airflow airflow dags trigger ingest_oltp_to_bronze
 | Servicio | URL / comando de verificación | Resultado esperado |
 |---|---|---|
 | PostgreSQL OLTP | `docker compose exec oltp-postgres pg_isready -U $POSTGRES_USER` | `accepting connections` |
-| MinIO API | `curl -sI http://localhost:9000/minio/health/live` | `200 OK` |
-| MinIO consola | <http://localhost:9001> | Login con `MINIO_ROOT_USER` |
+| RustFS API (S3) | `curl -sI http://localhost:9000/health` | `200 OK` |
+| RustFS consola | <http://localhost:9001> | Login con `MINIO_ROOT_USER` |
 | ClickHouse | `curl -s 'http://localhost:8123/?query=SELECT%201'` | `1` |
 | Airflow | <http://localhost:8080> (`admin` / ver `.env`) | 3 DAGs visibles |
 | MLflow | <http://localhost:5000/health> | `OK` |

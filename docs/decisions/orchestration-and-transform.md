@@ -27,7 +27,7 @@
 | Campo | Detalle |
 |---|---|
 | **Decisión** | dbt Core con capas `staging` → `intermediate` → `marts`, tests y `manifest.json` para linaje |
-| **Contexto** | Transformaciones SQL sobre Parquet (MinIO) y ClickHouse, con necesidad de tests y de trazabilidad columna a columna |
+| **Contexto** | Transformaciones SQL sobre Parquet (lake S3) y ClickHouse, con necesidad de tests y de trazabilidad columna a columna |
 | **Por qué** | El SQL versionado en Git sustituye a las "consultas sueltas"; `ref()`/`source()` construyen el DAG de linaje automáticamente; los tests (`unique`, `not_null`, `relationships`, `accepted_range`) son el *quality gate* del pipeline; `dbt docs` publica el grafo; es agnóstico del motor (ClickHouse hoy, DuckDB o Postgres mañana) |
 | **Cuándo NO** | Lógica procedural fila a fila o *streaming*; cuando se necesita un lenguaje de propósito general (aquí entran PySpark o Python); equipos que no van a mantener modelos ni tests |
 | **Señal de migración** | Transformaciones que requieren bucles, UDFs complejas o estado entre filas que el SQL no expresa con claridad |

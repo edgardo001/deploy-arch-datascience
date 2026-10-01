@@ -40,7 +40,7 @@
 |---|---|---|---|
 | `D-01` | PostgreSQL como fuente transaccional (OLTP) | [storage-and-runtime.md](storage-and-runtime.md) | Alta (coste bajo) |
 | `D-02` | Una instancia PostgreSQL con 3 bases y no 3 instancias | [storage-and-runtime.md](storage-and-runtime.md) | Alta |
-| `D-03` | MinIO como Data Lake compatible con S3 | [storage-and-runtime.md](storage-and-runtime.md) | Alta |
+| `D-03` | RustFS como Data Lake compatible con S3 (antes MinIO, ver `TD-01` resuelta) | [storage-and-runtime.md](storage-and-runtime.md) | Alta |
 | `D-04` | Parquet particionado (`dt=`) como formato de Bronze | [storage-and-runtime.md](storage-and-runtime.md) | Media (reescribir Bronze) |
 | `D-05` | ClickHouse como Data Warehouse OLAP | [storage-and-runtime.md](storage-and-runtime.md) | Alta (dbt abstrae el SQL) |
 | `D-06` | DuckDB como réplica analítica *ad-hoc* | [storage-and-runtime.md](storage-and-runtime.md) | Alta |
@@ -68,6 +68,7 @@
 | Más de ~10^8 filas en un hechos o *joins* de alta cardinalidad | `D-05` | Repensar modelo o motor (Snowflake/BigQuery/Spark) |
 | Regulación que exija *lineage* auditable y *feature store* | `D-13`, `D-18` | Añadir OpenLineage + Feast |
 | El equipo de BI crece y exige gobierno fino de permisos | `D-17` | Consolidar en Superset (o Looker/Power BI) |
+| Política de licencias: solo permisivas (Apache/MIT/BSD) | `D-03` (`TD-01` resuelta en [storage-and-runtime.md](storage-and-runtime.md) §8) | Lake migrado de MinIO (AGPLv3) a RustFS (Apache-2.0) |
 | Deriva semántica en la memoria de agentes | `D-16` | Reindexado y evaluación de *retrieval* |
 
 ## 6. Cómo añadir una decisión

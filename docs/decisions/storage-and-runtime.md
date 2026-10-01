@@ -38,16 +38,17 @@
 | Metadata de Airflow en SQLite | Cero configuración | No soporta `LocalExecutor` con paralelismo real |
 | Todo en una sola base | Máxima simplicidad | Mezcla OLTP y metadata: riesgo de permisos y de bloqueos cruzados |
 
-## `D-03` · MinIO como Data Lake compatible con S3
+## `D-03` · RustFS como Data Lake compatible con S3 (antes MinIO)
 
 | Campo | Detalle |
 |---|---|
-| **Decisión** | MinIO (`s3://datalake`) para Bronze, Silver/Gold Parquet y artefactos de MLflow |
-| **Contexto** | Se quiere ensayar el patrón S3 + Parquet sin coste de nube ni credenciales reales |
-| **Por qué** | API S3 real (el mismo `boto3`, el mismo `s3()` de ClickHouse y el mismo *artifact root* de MLflow que en producción); ligero (~100 MB), con consola web; la ruta `s3://…` es portabilidad pura |
+| **Decisión** | RustFS 1.0 (`s3://datalake`) para Bronze, Silver/Gold Parquet y artefactos de MLflow |
+| **Contexto** | Se quiere ensayar el patrón S3 + Parquet sin coste de nube ni credenciales reales, solo con licencias permisivas |
+| **Por qué** | API S3 real (el mismo `boto3`, el mismo `s3()` de ClickHouse y el mismo *artifact root* de MLflow que en producción); ligero, con consola web; la ruta `s3://…` es portabilidad pura; **Apache-2.0**, sin copyleft |
 | **Cuándo NO** | Cuando se exijan 11 nueves de durabilidad, replicación multi-región, *versioning* con *object lock* o auditoría de acceso; o si el volumen supera el disco local disponible |
 | **Señal de migración** | Necesidad de durabilidad/geo-redundancia o de compartir el lake con otros equipos |
 | **Reversibilidad** | **Alta**: cambiar `endpoint_url` y credenciales; las rutas `s3://` no cambian |
+| **Historial** | Hasta oct-2026 fue MinIO; se migró por `TD-01` (licencia AGPLv3 + imágenes eliminadas de Docker Hub). Se conserva el nombre de servicio `minio` para no tocar endpoints |
 
 | Alternativa | Pros | Contras |
 |---|---|---|
@@ -127,6 +128,19 @@
 | Podman + Compose | Sin demonio, *rootless* | Compatibilidad desigual con `depends_on`/healthchecks |
 | Instalación nativa (apt/pip) | Rendimiento máximo | Infierno de dependencias y de versiones; nada reproducible |
 | Nube gestionada (MWAA + RDS + S3) | Paridad total con producción | Coste por hora y credenciales; no es un entorno local |
+
+## 8. Deuda técnica — `TD-01` · Sustituir MinIO (AGPLv3) por S3 compatible con licencia permisiva
+
+| Campo | Detalle |
+|---|---|
+| **Estado** | ✅ Resuelta (oct-2026): migrado a RustFS 1.0 en `docker-compose.yml` |
+| **Deuda** | MinIO Community es [AGPLv3](https://github.com/minio/minio/blob/master/LICENSE) (copyleft restrictivo): quien lo modifique y lo ofrezca como servicio de red debe publicar su código. Además pasó a distribución *source-only* y sus imágenes `minio/minio` / `minio/mc` fueron eliminadas de Docker Hub (sep-2026), lo que rompió `docker compose pull` en este repo |
+| **Política objetivo** | Solo licencias permisivas: Apache-2.0, MIT, BSD (o equivalentes como PostgreSQL License). Sin copyleft (sin AGPL/GPL) en el stack |
+| **Candidatas** | [RustFS](https://github.com/rustfs/rustfs) (Apache-2.0, S3-compatible, migración *in-place* desde MinIO, v1.0 GA sep-2026 — favorita) · [SeaweedFS](https://github.com/seaweedfs/seaweedfs) (Apache-2.0, alternativa madura) · [lakeFS](https://github.com/treeverse/lakeFS) (Apache-2.0, si se necesita versionado). Descartado [Garage](https://garagehq.deuxfleurs.fr/): es AGPLv3, no cumple la política |
+| **Plan** | *Spike* de compatibilidad (boto3, `s3()` de ClickHouse, *artifact root* de MLflow, consola, CLI `mc`→equivalente) y luego cambio de imagen en `docker-compose.yml` + `docker-setup.md` + glosario §8 |
+| **DoD** | Ingesta, `dbt build`, tracking de MLflow y consola S3 verificados contra el sustituto; `docker compose up -d` en frío en verde; sin referencias a imágenes MinIO |
+| **Cierre** | Servicio `minio` = `rustfs/rustfs:1.0.0`, init con `amazon/aws-cli`, healthcheck sobre `/health` + consola; servicio `minio` conservado como nombre para no tocar endpoints |
+| **Observación** | Metabase Community también es AGPLv3; queda fuera de esta deuda y se evaluará aparte (ver `D-17`) |
 
 ## Navegación
 

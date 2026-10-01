@@ -22,7 +22,7 @@ docker compose up -d minio-init          # crea bronze/silver/gold/mlflow
 docker compose ps                        # esperar 9/9 healthy
 ```
 
-**Aceptación**: `docker compose ps` muestra los 9 servicios permanentes *healthy* y existen los 4 buckets.
+**Aceptación**: `docker compose ps` muestra los 9 servicios permanentes *healthy* y existe el bucket `datalake`.
 **Pista**: si Airflow no arranca → `AIRFLOW_UID` en `.env` ([runbook.md](../operations/runbook.md) §4).
 
 ## `L-02` · Mapa de servicios y puertos
@@ -30,7 +30,7 @@ docker compose ps                        # esperar 9/9 healthy
 **Objetivo**: asociar cada puerto con su servicio y su rol, sin mirar la tabla.
 
 ```bash
-curl -sI http://localhost:9000/minio/health/live | head -1
+curl -sI http://localhost:9000/health | head -1
 curl -s 'http://localhost:8123/?query=SELECT%201'
 curl -s http://localhost:6333/healthz
 ```

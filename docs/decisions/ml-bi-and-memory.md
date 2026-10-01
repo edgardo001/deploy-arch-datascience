@@ -28,7 +28,7 @@
 |---|---|
 | **Decisión** | JupyterLab con `pandas`, `scikit-learn`, `XGBoost`, `PySpark` y `clickhouse-connect`, montado sobre `./infra/jupyter/work` |
 | **Contexto** | Fase exploratoria (EDA) y construcción de *features* antes de fijarlas en dbt o en `pipelines/` |
-| **Por qué** | Estándar de facto en ciencia de datos; ejecución por celdas con visualización inmediata; el *bind mount* deja los notebooks versionados en Git y auditables; el mismo contenedor tiene acceso a ClickHouse, MinIO y MLflow por la red interna |
+| **Por qué** | Estándar de facto en ciencia de datos; ejecución por celdas con visualización inmediata; el *bind mount* deja los notebooks versionados en Git y auditables; el mismo contenedor tiene acceso a ClickHouse, el lake S3 y MLflow por la red interna |
 | **Cuándo NO** | Cuando el código ya es un *pipeline*: los notebooks no se testean ni se revisan bien en un *diff*; tampoco para procesos programados o con estado compartido entre usuarios |
 | **Señal de migración** | La lógica del notebook se usa más de una vez: debe convertirse en modelo dbt o script de `pipelines/` |
 | **Reversibilidad** | **Baja**: la imagen se cambia en una línea del Compose |

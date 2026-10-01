@@ -34,7 +34,7 @@ plataforma" se exige `N2` en `M5`, `M6` y `M8`.
 | `Q-03` | ¿Por qué Bronze está particionado por `dt=`? | Idempotencia (reemplazo de partición) y poda de lectura | `D-04` |
 | `Q-04` | ¿Qué garantiza el *watermark*? | Extraer solo lo nuevo usando `updated_at`, sin releer todo | `D-10` |
 | `Q-05` | ¿Qué no captura la ingesta por *watermark*? | Los borrados físicos (no hay `updated_at` que los registre) | `D-10` |
-| `Q-06` | ¿Qué hace `minio-init`? | Crea los 4 buckets y termina (servicio *one-shot*) | [docker-setup.md](../infrastructure/docker-setup.md) §2 |
+| `Q-06` | ¿Qué hace `minio-init`? | Crea el bucket `datalake` y termina (servicio *one-shot*) | [docker-setup.md](../infrastructure/docker-setup.md) §2 |
 | `Q-07` | ¿Por qué el servicio `dbt` no tiene *healthcheck*? | Es efímero: se valida con `dbt build` exit 0 | [docker-setup.md](../infrastructure/docker-setup.md) §7 |
 | `Q-08` | ¿Por qué Bronze no se consume desde BI? | Es crudo y sin contrato de calidad; BI lee marts | [data-pipeline.md](../architecture/data-pipeline.md) §6 |
 | `Q-09` | ¿Qué diferencia `stg_`, `int_`, `dim_` y `fct_`? | Limpieza, integración, dimensión y hecho | [glossary.md](../glossary.md) §9 |

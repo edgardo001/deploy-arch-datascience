@@ -21,9 +21,8 @@ Regla dura: si una intención obtiene `score < 0.55`, **pregunta** en lugar de a
 ## 2. `platform` — Data Platform & Infrastructure Agent
 
 ```bash
-docker compose up -d && docker compose ps --format 'table {{.Name}}\t{{.Status}}'
-docker compose exec minio mc mb -p local/datalake/{bronze,silver,gold,mlflow}
-docker compose exec minio mc admin info local
+docker compose up -d --build && docker compose ps --format 'table {{.Name}}\t{{.Status}}'
+docker compose exec minio-init aws --endpoint-url http://minio:9000 --region us-east-1 s3 ls s3://datalake/
 curl -s 'http://localhost:8123/?query=SELECT%20version()'
 psql "$DSN_OLTP" -c '\d+ public.orders'
 ```
@@ -32,7 +31,7 @@ psql "$DSN_OLTP" -c '\d+ public.orders'
 |---|---|---|
 | Stack *healthy*, buckets, DSN efímeros | 9 healthchecks + conectividad | 9/9 en verde y smoke test del README OK |
 
-Credenciales efímeras: usuario de solo lectura en OLTP y *access key* temporal de MinIO por `run_id`.
+Credenciales efímeras: usuario de solo lectura en OLTP y *access key* temporal del lake S3 por `run_id`.
 
 ## 3. `data_engineer` — Data Engineer Agent
 
@@ -40,7 +39,7 @@ Credenciales efímeras: usuario de solo lectura en OLTP y *access key* temporal 
 airflow dags list | grep ingest_
 airflow dags trigger ingest_oltp_to_bronze --conf '{"entities":["orders","customers"],"mode":"incremental"}'
 airflow tasks test ingest_oltp_to_bronze extract_orders 2026-02-14
-docker compose exec minio mc ls --recursive local/datalake/bronze/orders/ | tail -5
+docker compose run --rm minio-init 'aws --endpoint-url http://minio:9000 --region us-east-1 s3 ls --recursive s3://datalake/bronze/orders/ | tail -5'
 ```
 
 ```sql

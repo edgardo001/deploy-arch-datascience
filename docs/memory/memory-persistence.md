@@ -12,7 +12,7 @@
 | `airflow_meta` | PostgreSQL 16 | `oltp-postgres:5432` | Estado de DAGs y tareas | `pg_dump` diario |
 | `datalab_knowledge` | Qdrant | `qdrant:6333` | Embeddings de docs, model cards, incidentes | Snapshot semanal |
 | `mlruns` | MLflow (backend PostgreSQL + artefactos S3) | `mlflow:5000` | Runs, métricas, artefactos, registro de modelos | Réplica a `s3://datalake/mlflow` |
-| `dbt_artifacts` | Volumen + MinIO | — | `manifest.json`, `catalog.json`, `run_results.json` | Por commit de Git |
+| `dbt_artifacts` | Volumen + lake S3 | — | `manifest.json`, `catalog.json`, `run_results.json` | Por commit de Git |
 
 Las tres bases PostgreSQL conviven en una sola instancia local (`ecommerce_oltp`, `datalab_meta`,
 `airflow_meta`) para simplificar el entorno de pruebas; en producción se separan por criticidad.
@@ -128,7 +128,7 @@ docker compose exec oltp-postgres pg_dump -U "$POSTGRES_USER" -Fc datalab_meta >
 docker compose exec -T oltp-postgres pg_restore -U "$POSTGRES_USER" -d datalab_meta --clean < backup/meta_2026-02-14.dump
 
 # Data Lake (Bronze/Silver/Gold + artefactos MLflow)
-docker compose run --rm minio-init mc mirror --overwrite local/datalake /backup/datalake
+docker compose run --rm minio-init aws --endpoint-url http://minio:9000 --region us-east-1 s3 sync s3://datalake /backup/datalake
 
 # Vector DB
 curl -X POST http://localhost:6333/snapshots -H 'Content-Type: application/json' \
@@ -142,7 +142,7 @@ curl -X POST http://localhost:6333/snapshots -H 'Content-Type: application/json'
 | `session_events` | 30 d | `DELETE ... WHERE ts < now() - interval '30 days'` (job diario) |
 | `routing_decisions` | 90 d | Purga programada |
 | `ingest_audit` | 365 d | Particionado por mes y `DROP PARTITION` |
-| Bronze Parquet | 90 d | Ciclo de vida `mc ilm` sobre la ruta `bronze/` |
+| Bronze Parquet | 90 d | Reglas de ciclo de vida (ILM) del lake sobre el prefijo `bronze/` |
 | Silver/Gold Parquet | 365 d | Ciclo de vida sobre `silver/`, `gold/` |
 | Artefactos MLflow | 730 d | Exportación a almacenamiento frío antes de borrar |
 | Embeddings | Reindexado trimestral | Reemplazo por colección nueva y alias swap |

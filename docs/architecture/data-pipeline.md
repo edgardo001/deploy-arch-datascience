@@ -10,7 +10,7 @@
 | Principio | Implementación local |
 |---|---|
 | Arquitectura Medallion | `bronze` (crudo inmutable) → `silver` (limpio/conformado) → `gold` (modelado para consumo) |
-| *ELT* antes que *ETL* | Se carga crudo en MinIO y se transforma con SQL en dbt (motor ClickHouse/DuckDB) |
+| *ELT* antes que *ETL* | Se carga crudo en el lake S3 (RustFS) y se transforma con SQL en dbt (motor ClickHouse/DuckDB) |
 | Idempotencia | Particiones `dt=YYYY-MM-DD` con *overwrite* controlado por `run_id` |
 | Contratos primero | Esquema, granularidad, dueño y tests definidos antes de escribir el modelo |
 | Linaje verificable | `manifest.json` de dbt + OpenLineage alimentan el grafo de dependencias |

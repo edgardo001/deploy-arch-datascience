@@ -12,7 +12,7 @@
 | Seguir logs de orquestación | `docker compose logs -f --tail=100 airflow` |
 | Reiniciar un servicio | `docker compose restart clickhouse` |
 | Consultar el OLTP | `docker compose exec oltp-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_OLTP_DB" -c '\dt'` |
-| Inspeccionar el Data Lake | `docker compose run --rm minio-init 'mc ls --recursive local/datalake/bronze/ \| tail -5'` |
+| Inspeccionar el Data Lake | `docker compose run --rm minio-init 'aws --endpoint-url http://minio:9000 --region us-east-1 s3 ls --recursive s3://datalake/bronze/ \| tail -5'` |
 | Reconstruir marts | `docker compose --profile transform run --rm dbt build --select marts` |
 | Detener conservando datos | `docker compose down` |
 | Borrar todo el estado | `docker compose down -v` (**destructivo**: elimina volúmenes) |
@@ -20,9 +20,9 @@
 ```bash
 # Secuencia de arranque recomendada
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 docker compose ps                       # esperar 9/9 healthy (dbt es efímero)
-docker compose up -d minio-init         # buckets bronze/silver/gold/mlflow
+docker compose up -d minio-init         # bucket datalake (prefijos bronze/silver/gold/mlflow)
 docker compose exec airflow airflow dags list
 ```
 

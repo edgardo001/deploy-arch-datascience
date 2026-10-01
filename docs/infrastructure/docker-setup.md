@@ -23,18 +23,19 @@ penalizaciones de I/O y problemas de permisos en los volúmenes de Airflow.
 | Servicio | Contenedor | Imagen | Puerto host → contenedor | Volumen | Healthcheck |
 |---|---|---|---|---|---|
 | PostgreSQL OLTP | `oltp-postgres` | `postgres:16-alpine` | 5432 → 5432 | `pgdata` | `pg_isready -U ${POSTGRES_USER}` |
-| MinIO | `minio` | `minio/minio:RELEASE.2024-06-13T22-53-53Z` | 9000/9001 → 9000/9001 | `minio_data` | `mc ready local` |
+| RustFS (S3) | `minio` | `rustfs/rustfs:1.0.0` (Apache-2.0) | 9000/9001 → 9000/9001 | `minio_data` | `curl -fsS 127.0.0.1:9000/health` + consola |
 | ClickHouse | `clickhouse` | `clickhouse/clickhouse-server:24.3` | 8123 → 8123, 9100 → 9000 | `clickhouse_data` | `wget --spider -q localhost:8123/ping` |
 | Airflow | `airflow` | build de `infra/airflow` (base `apache/airflow:2.9.3-python3.11`) | 8080 → 8080 | `airflow_logs` | `curl -fsS http://localhost:8080/health` |
 | dbt | `dbt` (perfil `transform`) | build local de `infra/dbt` | — | `dbt_artifacts` | `dbt build` exit 0 |
 | MLflow | `mlflow` | build de `infra/mlflow` (base `ghcr.io/mlflow/mlflow:v2.14.1`) | 5000 → 5000 | `mlflow_artifacts` | `python -c urlopen('/health')` |
-| JupyterLab | `jupyter` | `quay.io/jupyter/pyspark-notebook:2024-06-01` | 8888 → 8888 | `./infra/jupyter/work` (bind) | `python -c urlopen('/api/status')` |
+| JupyterLab | `jupyter` | `quay.io/jupyter/pyspark-notebook:2024-06-03` | 8888 → 8888 | `./infra/jupyter/work` (bind) | `python -c urlopen('/login')` |
 | Metabase | `metabase` | `metabase/metabase:v0.50.13` | 3000 → 3000 | `metabase_data` | Sonda TCP `:3000` |
 | Superset | `superset` | `apache/superset:3.1.3` | 8088 → 8088 | `superset_data` | Sonda TCP `:8088` |
 | Qdrant | `qdrant` | `qdrant/qdrant:v1.9.2` | 6333 → 6333 | `qdrant_data` | Sonda TCP `:6333` |
 
-Además existe el *one-shot* `minio-init` (`minio/mc`), que crea los buckets y termina; no cuenta como servicio
-permanente. Los nueve servicios permanentes declaran `healthcheck` con `interval: 15s`, `timeout: 5s`,
+Además existen dos *one-shot*: `lake-permission-helper` (`alpine:3`, deja el volumen escribible para el
+usuario no-root de RustFS) y `minio-init` (`amazon/aws-cli`, crea el bucket `datalake` y termina); no cuentan como
+servicios permanentes. Enlaces oficiales (sitio, documentación y GitHub) de cada herramienta: [glossary.md](../glossary.md) §8. Los nueve servicios permanentes declaran `healthcheck` con `interval: 15s`, `timeout: 5s`,
 `retries: 5` y `start_period` diferenciado (ClickHouse, Airflow y el *front-end* de BI: 60 s; el resto: 20–30 s);
 `dbt` es efímero (perfil `transform`) y se valida con `dbt build` exit 0, no con sonda de puerto.
 
@@ -53,7 +54,7 @@ deploy-arch-datascience/
 │   └── memory/memory-persistence.md
 └── infra/
     ├── postgres/init/{01_databases,02_oltp_schema,03_oltp_seed}.sql   # bases, OLTP y semilla
-    ├── minio/                                # los buckets se crean con el one-shot `minio-init`
+    ├── minio/                                # reservado: el bucket `datalake` lo crea el one-shot `minio-init`
     ├── clickhouse/init/01_marts.sql        # base `marts` y usuario de dbt
     ├── airflow/{Dockerfile,requirements.txt,dags,plugins}/  # DAGs ingest_*, transform_*, train_*
     ├── dbt/{models,macros,seeds,tests}/    # staging → intermediate → marts

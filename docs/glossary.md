@@ -18,10 +18,10 @@
 | **OLTP** | Online Transaction Processing | PostgreSQL `ecommerce_oltp`: pedidos, clientes, productos; solo lectura para el pipeline |
 | **OLAP** | Online Analytical Processing | ClickHouse `marts`: consultas agregadas sobre el modelo en estrella |
 | **DW / DWH** | Data Warehouse | Capa Gold servida por ClickHouse (y DuckDB como réplica local) |
-| **Data Lake** | Repositorio de datos crudos en objetos | MinIO con Parquet inmutable en `bronze/` |
+| **Data Lake** | Repositorio de datos crudos en objetos | RustFS (S3) con Parquet inmutable en `bronze/` |
 | **Lakehouse** | Lake + capacidades de warehouse | Bronze en S3 + transformación SQL con dbt, sin mover los datos a otro motor |
 | **Medallion** | Arquitectura por capas de calidad | `bronze` (crudo) → `silver` (conformado) → `gold` (modelado) |
-| **S3** | Simple Storage Service (API de AWS) | MinIO la emula en local; rutas `s3://datalake/...` |
+| **S3** | Simple Storage Service (API de AWS) | RustFS la implementa en local; rutas `s3://datalake/...` |
 | **Parquet** | Formato columnar comprimido | Formato de todo el lake; compresión `snappy` |
 | **ELT / ETL** | Extract-Load-Transform / Extract-Transform-Load | Aquí **ELT**: se carga crudo y se transforma dentro del DW con dbt |
 | **CDC** | Change Data Capture | Patrón alternativo a la extracción por *watermark* (no implementado) |
@@ -121,19 +121,23 @@
 
 ## 8. Los servicios del stack, uno por uno
 
-| Servicio (contenedor) | Siglas | Qué es y para qué está aquí |
-|---|---|---|
-| PostgreSQL OLTP (`oltp-postgres`) | OLTP, SQL | Base transaccional del e-commerce simulado + `datalab_meta` (metadata) + `airflow_meta` |
-| MinIO (`minio`) | S3, API | Emulador de S3: guarda el Parquet crudo (Bronze), el conformado y los artefactos de MLflow |
-| ClickHouse (`clickhouse`) | OLAP, DW | Motor columnar del Data Warehouse: materializa los marts en estrella |
-| Apache Airflow (`airflow`) | DAG, ELT | Orquesta la ingesta, la transformación con dbt y el entrenamiento/publicación del modelo |
-| dbt (`dbt`, efímero) | SQL, ELT, SK/BK | Transforma Bronze en Silver/Gold y ejecuta los tests de calidad y el linaje |
-| MLflow (`mlflow`) | MLOps, Model Registry | Registra experimentos, métricas, artefactos y versiones promovibles del modelo |
-| JupyterLab (`jupyter`) | EDA, PySpark | Entorno de experimentación con pandas, scikit-learn, XGBoost y PySpark |
-| Metabase (`metabase`) | BI, KPI | BI *self-service* para explorar los marts sin escribir SQL |
-| Apache Superset (`superset`) | BI, API | Dashboards avanzados y alertas con control fino de permisos |
-| Qdrant (`qdrant`) | Vector DB, Embedding | Memoria de largo plazo de los agentes (documentación, model cards, incidentes) |
-| *(auxiliares)* | one-shot | `minio-init` crea los buckets y termina; `dbt` se ejecuta bajo demanda con `--profile transform` |
+| Servicio (contenedor) | Siglas | Qué es y para qué está aquí | Licencia | Sitio oficial | Documentación oficial | GitHub |
+|---|---|---|---|---|---|---|
+| PostgreSQL OLTP (`oltp-postgres`) | OLTP, SQL | Base transaccional del e-commerce simulado + `datalab_meta` (metadata) + `airflow_meta` | PostgreSQL License (permisiva) | [postgresql.org](https://www.postgresql.org/) | [docs](https://www.postgresql.org/docs/) | [postgres/postgres](https://github.com/postgres/postgres) |
+| RustFS (`minio`) | S3, API | Motor S3: guarda el Parquet crudo (Bronze), el conformado y los artefactos de MLflow. Se conserva el nombre de servicio `minio` para no tocar endpoints | Apache-2.0 | [rustfs.com](https://rustfs.com/) | [docs](https://docs.rustfs.com/) | [rustfs/rustfs](https://github.com/rustfs/rustfs) |
+| ClickHouse (`clickhouse`) | OLAP, DW | Motor columnar del Data Warehouse: materializa los marts en estrella | Apache-2.0 | [clickhouse.com](https://clickhouse.com/) | [docs](https://clickhouse.com/docs) | [ClickHouse/ClickHouse](https://github.com/ClickHouse/ClickHouse) |
+| Apache Airflow (`airflow`) | DAG, ELT | Orquesta la ingesta, la transformación con dbt y el entrenamiento/publicación del modelo | Apache-2.0 | [airflow.apache.org](https://airflow.apache.org/) | [docs](https://airflow.apache.org/docs/apache-airflow/stable/) | [apache/airflow](https://github.com/apache/airflow) |
+| dbt (`dbt`, efímero) | SQL, ELT, SK/BK | Transforma Bronze en Silver/Gold y ejecuta los tests de calidad y el linaje | Apache-2.0 | [getdbt.com](https://www.getdbt.com/) | [docs](https://docs.getdbt.com/) | [dbt-labs/dbt-core](https://github.com/dbt-labs/dbt-core) |
+| MLflow (`mlflow`) | MLOps, Model Registry | Registra experimentos, métricas, artefactos y versiones promovibles del modelo | Apache-2.0 | [mlflow.org](https://mlflow.org/) | [docs](https://mlflow.org/docs/latest/) | [mlflow/mlflow](https://github.com/mlflow/mlflow) |
+| JupyterLab (`jupyter`) | EDA, PySpark | Entorno de experimentación con pandas, scikit-learn, XGBoost y PySpark | BSD-3-Clause | [jupyter.org](https://jupyter.org/) | [docker-stacks docs](https://jupyter-docker-stacks.readthedocs.io/) | [jupyter/docker-stacks](https://github.com/jupyter/docker-stacks) |
+| Metabase (`metabase`) | BI, KPI | BI *self-service* para explorar los marts sin escribir SQL | AGPLv3 ⚠️ (edición Community) | [metabase.com](https://www.metabase.com/) | [docs](https://www.metabase.com/docs/latest/) | [metabase/metabase](https://github.com/metabase/metabase) |
+| Apache Superset (`superset`) | BI, API | Dashboards avanzados y alertas con control fino de permisos | Apache-2.0 | [superset.apache.org](https://superset.apache.org/) | [docs](https://superset.apache.org/docs/intro) | [apache/superset](https://github.com/apache/superset) |
+| Qdrant (`qdrant`) | Vector DB, Embedding | Memoria de largo plazo de los agentes (documentación, model cards, incidentes) | Apache-2.0 | [qdrant.tech](https://qdrant.tech/) | [docs](https://qdrant.tech/documentation/) | [qdrant/qdrant](https://github.com/qdrant/qdrant) |
+| *(auxiliares)* | one-shot | `minio-init` crea los buckets y termina; `dbt` se ejecuta bajo demanda con `--profile transform` | Según imagen (`mc`: AGPLv3; `dbt`: Apache-2.0) | — | — | — |
+
+Política de licencias: solo permisivas (Apache-2.0, MIT, BSD o equivalentes). Cumplen todas salvo Metabase
+(AGPLv3, edición Community): el lake migró de MinIO a RustFS (`TD-01` resuelta en
+[storage-and-runtime.md](decisions/storage-and-runtime.md) §8); Metabase queda flagged para evaluación aparte (ver `D-17`).
 
 ## 9. Convenciones de nomenclatura del repositorio
 

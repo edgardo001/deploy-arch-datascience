@@ -46,7 +46,7 @@ docker compose exec oltp-postgres psql -U datalab -d datalab_meta -c \
 
 ### `T-04` · «Reprocesa el lunes» — `data_engineer` · 30 min
 **Te piden**: rehacer la carga de un día concreto.
-**Cómo**: mover el *watermark* y reejecutar el DAG con la fecha objetivo; reescribir la partición del lake con `docker compose run --rm minio-init 'mc ls --recursive local/datalake/bronze/orders/'` para verificar.
+**Cómo**: mover el *watermark* y reejecutar el DAG con la fecha objetivo; verificar la partición del lake con `docker compose run --rm minio-init 'aws --endpoint-url http://minio:9000 --region us-east-1 s3 ls --recursive s3://datalake/bronze/orders/'`.
 **Cierre**: mismos conteos, sin filas duplicadas ni huérfanas.
 **Base**: `M2`, `D-10` · **Riesgo**: refresco completo innecesario.
 
