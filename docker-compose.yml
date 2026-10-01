@@ -185,7 +185,7 @@ services:
 
   # ── 7. Entorno de experimentación ────────────────────────────────
   jupyter:
-    image: quay.io/jupyter/pyspark-notebook:2024-06-01
+    image: quay.io/jupyter/pyspark-notebook:2024-06-03
     container_name: jupyter
     restart: unless-stopped
     env_file: [.env]
