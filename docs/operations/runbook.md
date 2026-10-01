@@ -46,7 +46,7 @@ docker compose exec airflow airflow dags list
 
 | Síntoma | Causa probable | Acción |
 |---|---|---|
-| `airflow` en `unhealthy` | `AIRFLOW_UID` sin definir o logs sin permisos | `echo "AIRFLOW_UID=$(id -u)" >> .env` y `docker compose up -d --force-recreate airflow` |
+| `airflow` en `unhealthy` o `airflow users create` falla | `AIRFLOW_UID` con UID sin entrada en la imagen | Fijar `AIRFLOW_UID=50000` en `.env` y `docker compose up -d --force-recreate airflow` |
 | dbt: `Database Error: Connection refused` | Perfil apuntando a `localhost` dentro de la red Docker | Usar nombre de servicio (`clickhouse`, `minio`) como host |
 | MLflow sin artefactos | Falta `MLFLOW_S3_ENDPOINT_URL` o credenciales S3 | Definir `MLFLOW_S3_ENDPOINT_URL=http://minio:9000` y `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` con `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` |
 | Lake responde 403 en S3 | Credenciales desalineadas o bucket inexistente | Reejecutar `docker compose up -d minio-init` (AWS CLI contra `http://minio:9000`) |

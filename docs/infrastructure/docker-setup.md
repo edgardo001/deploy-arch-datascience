@@ -76,7 +76,7 @@ deploy-arch-datascience/
 | `MINIO_BUCKET` | Bucket raíz del lake | `datalake` |
 | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` | Usuario analítico del DW | `dbt` / `dbt_dev_pwd` |
 | `CLICKHOUSE_HTTP_PORT` | Puerto host de la API HTTP (contenedor siempre 8123) | `8123` (Windows + WinNAT: `18123`) |
-| `AIRFLOW_UID` | UID del host para permisos de logs | `1000` (`id -u`) |
+| `AIRFLOW_UID` | UID con el que corre Airflow (debe existir en la imagen: `50000`) | `50000` |
 | `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` | Acceso a la UI de Airflow | `admin` / `admin` |
 | `MLFLOW_TRACKING_URI` | Backend de tracking | `http://mlflow:5000` |
 | `MLFLOW_S3_ENDPOINT_URL` | Endpoint S3 para artefactos | `http://minio:9000` |

@@ -131,11 +131,12 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-    command: >
-      bash -c "airflow db migrate &&
-               (airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD}
-                 --firstname Data --lastname Lab --role Admin --email admin@datalab.local || true) &&
-               exec airflow webserver"
+    # Entrypoint explícito: la imagen trae el CLI `airflow` como entrypoint y
+    # trataría el script como subcomando. Con `bash -c` el bootstrap llega íntegro.
+    entrypoint: ["/bin/bash", "-c"]
+    # Lista de UN elemento: en forma string Compose trocea por palabras y el
+    # `users create` perdía argumentos (igual que pasaba en `minio-init`).
+    command: ["airflow db migrate && (airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD} --firstname Data --lastname Lab --role Admin --email admin@datalab.local || true) && exec airflow webserver"]
     ports: ["8080:8080"]
     volumes:
       - ./infra/airflow/dags:/opt/airflow/dags
